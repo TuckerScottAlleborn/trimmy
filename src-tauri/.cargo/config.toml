@@ -1,0 +1,4 @@
+# Link the C runtime into trimmy.exe so the installed app doesn't need the
+# Visual C++ Redistributable on the user's machine.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
