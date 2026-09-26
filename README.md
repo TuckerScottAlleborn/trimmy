@@ -12,6 +12,8 @@
 <p align="center">
   <a href="https://github.com/TuckerScottAlleborn/trimmy/releases/latest"><b>⬇ Download for Windows</b></a>
   ·
+  <a href="#macos-untested">macOS (untested)</a>
+  ·
   <a href="#using-trimmy">How to use it</a>
   ·
   <a href="#building-from-source">Build it yourself</a>
@@ -79,6 +81,38 @@ costs money every year), so Windows SmartScreen warns about any new download lik
 **Settings → Apps → Installed apps → Trimmy → Uninstall.** Your videos and exported clips are
 never touched.
 
+## macOS (untested)
+
+> [!WARNING]
+> **The macOS version has never been run on a real Mac.** The author doesn't have one. It is
+> built automatically from the same code by [GitHub Actions](.github/workflows/release.yml) on
+> a macOS machine, which checks that it compiles, passes its tests, packages correctly for both
+> Apple Silicon and Intel, and that its bundled FFmpeg runs. Nobody has clicked through it yet.
+> If you try it, please [open an issue](https://github.com/TuckerScottAlleborn/trimmy/issues)
+> saying whether it worked, even if it did.
+
+1. From the **[latest release](https://github.com/TuckerScottAlleborn/trimmy/releases/latest)**,
+   download **`Trimmy_x.y.z_universal.dmg`**. One file for Apple Silicon (M1 and later) and Intel
+   Macs, macOS 11 Big Sur or newer.
+2. Open it and drag **Trimmy** into **Applications**.
+3. The first time you open it, macOS will refuse, because the app isn't notarized by Apple
+   (that needs a paid Apple Developer account). Either:
+   - open **System Settings → Privacy & Security**, scroll down, and click **Open Anyway** next
+     to the Trimmy message; or
+   - in Terminal, run `xattr -dr com.apple.quarantine /Applications/Trimmy.app`.
+
+On a Mac, shortcuts use **⌘** where Windows uses Ctrl (**⌘O** to open), and Trimmy shows up in
+Finder's **Open With** menu for video files. To uninstall, drag Trimmy from Applications to the
+Trash.
+
+Things that are likely to behave differently from Windows, but are unconfirmed:
+
+- **Preview** uses macOS's own video engine (the one Safari uses), so which formats preview
+  differs. HEVC should always preview on a Mac. MKV, AVI and TS probably won't, but still trim
+  and export fine.
+- **Finder "Open With"**, drag and drop from Finder, and **[show in folder]** use macOS-specific
+  code paths that have only ever been compiled, never clicked.
+
 ## Using Trimmy
 
 1. **Open a video.** Drag it onto the window, paste its full path into the box and press
@@ -98,7 +132,7 @@ never touched.
 | **X** | Clear the start and end (back to the whole video) |
 | **←** / **→** | Step one frame |
 | **Shift** + **←** / **→** | Step one second |
-| **Ctrl+O** | Open a video |
+| **Ctrl+O** (⌘O on Mac) | Open a video |
 
 With a handle focused (click it or Tab to it), **←** / **→** nudge that handle instead.
 
@@ -182,6 +216,17 @@ error text and, if you can, the output of
   `winget install Microsoft.VisualStudio.2022.BuildTools --override "--passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"`
 - WebView2 (already on Windows 10 and 11)
 
+### Prerequisites (macOS, untested)
+
+- Node.js and Rust as above, plus the Xcode Command Line Tools: `xcode-select --install`
+- For the universal (Apple Silicon + Intel) build:
+  `rustup target add aarch64-apple-darwin x86_64-apple-darwin`
+
+On a Mac, the FFmpeg download fetches both CPU builds and joins them with `lipo`. Build the
+universal `.dmg` with `npm run tauri build -- --target universal-apple-darwin`; it lands in
+`src-tauri/target/universal-apple-darwin/release/bundle/dmg/`. Mac-only settings live in
+`src-tauri/tauri.macos.conf.json`, which Tauri merges over `tauri.conf.json` on macOS.
+
 See [Tauri's prerequisites](https://tauri.app/start/prerequisites/) for details.
 
 ### Run and build
@@ -240,6 +285,7 @@ src-tauri/                   Rust backend (Tauri 2)
   src/export.rs              Cuts the clip (FFmpeg stream copy), names the output
   src/waveform.rs            Audio peaks for the timeline
   tauri.conf.json            App, window and installer config
+  tauri.macos.conf.json      macOS-only overrides (.dmg, Finder "Open With")
   icons/icon.svg             Glitch, the app icon (all other icons are generated from it)
 scripts/fetch-ffmpeg.mjs     Downloads the pinned FFmpeg sidecars and license
 scripts/make-test-clips.mjs  Builds the test clip set
@@ -251,7 +297,7 @@ scripts/make-test-clips.mjs  Builds the test clip set
 | Piece | Job |
 | --- | --- |
 | [Tauri 2](https://tauri.app) (Rust) | The app window and the commands that run FFmpeg |
-| [Svelte 5](https://svelte.dev) + TypeScript + Vite | The UI, rendered by Windows' built-in WebView2 |
+| [Svelte 5](https://svelte.dev) + TypeScript + Vite | The UI, rendered by the system web view (WebView2 on Windows, WebKit on macOS) |
 | [FFmpeg](https://ffmpeg.org) + ffprobe | All the real video work: reading files, the waveform, exporting |
 
 FFmpeg and ffprobe ship inside the app as [Tauri sidecars](https://v2.tauri.app/develop/sidecar/):
@@ -264,8 +310,10 @@ To regenerate the icons after editing `src-tauri/icons/icon.svg`:
 
 1. Bump the version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`.
 2. Commit, then tag and push: `git tag v0.2.0 && git push origin v0.2.0`.
-3. The [Release workflow](.github/workflows/release.yml) builds both installers on Windows and
-   attaches them to a **draft** release. Check it, then click **Publish**.
+3. The [Release workflow](.github/workflows/release.yml) builds the Windows installers, then
+   the universal macOS `.dmg` (running the Rust tests and a smoke test of the app bundle on a
+   macOS machine), and attaches them all to one **draft** release. Check it, then click
+   **Publish**.
 
 You can also run the workflow by hand from the **Actions** tab; the installers are then
 attached to that run as a downloadable artifact instead.
@@ -277,7 +325,8 @@ attached to that run as a downloadable artifact instead.
 - Remove audio / pick which audio track to keep
 - Export for Discord (a size target, like under 10 MB)
 - GIF export
-- macOS and Linux builds
+- Confirm the macOS build on real Macs (help wanted), then notarize it
+- Linux builds
 
 Simplicity is the feature. Anything that would add a second screen, a project file or a
 settings page probably doesn't belong here.
@@ -289,10 +338,10 @@ Trimmy is released under the [MIT License](LICENSE).
 It bundles third-party software, each under its own license (copies are installed in the
 app's `licenses` folder):
 
-- **[FFmpeg](https://ffmpeg.org)** 9.0.2, the "essentials" Windows build by
-  [gyan.dev](https://www.gyan.dev/ffmpeg/builds/), licensed under the **GNU GPL v3**. It runs as
-  a separate program and is not linked into Trimmy. Its source code is available from
-  [ffmpeg.org](https://ffmpeg.org/download.html#releases) and the exact build from
-  [GyanD/codexffmpeg](https://github.com/GyanD/codexffmpeg/releases/tag/9.0.2).
+- **[FFmpeg](https://ffmpeg.org)** 9.0.2, licensed under the **GNU GPL v3**. It runs as a
+  separate program and is not linked into Trimmy. Its source code is available from
+  [ffmpeg.org](https://ffmpeg.org/download.html#releases). The exact builds are the "essentials"
+  Windows build by [gyan.dev](https://github.com/GyanD/codexffmpeg/releases/tag/9.0.2) and the
+  macOS builds by [Martin Riedl](https://ffmpeg.martin-riedl.de/).
 - **[JetBrains Mono](https://www.jetbrains.com/lp/mono/)**, the UI font, under the SIL Open Font
   License 1.1.

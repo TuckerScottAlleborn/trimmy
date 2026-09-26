@@ -1,5 +1,8 @@
 import { invoke } from '@tauri-apps/api/core'
 
+/** True on macOS, where shortcuts use ⌘ instead of Ctrl and paths look like /Users/... */
+export const isMac = navigator.userAgent.includes('Mac')
+
 /** What the `open_video` command reports (see src-tauri/src/probe.rs). */
 export interface VideoInfo {
   path: string

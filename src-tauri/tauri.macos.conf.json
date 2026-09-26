@@ -1,0 +1,18 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "bundle": {
+    "targets": ["app", "dmg"],
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "signingIdentity": "-"
+    },
+    "fileAssociations": [
+      {
+        "ext": ["mp4", "m4v", "mov", "mkv", "webm", "avi", "ts", "m2ts", "mts", "wmv", "flv", "3gp", "mpg", "mpeg"],
+        "name": "Video",
+        "role": "Viewer",
+        "rank": "Alternate"
+      }
+    ]
+  }
+}

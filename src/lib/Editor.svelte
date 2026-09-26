@@ -71,7 +71,7 @@
   }
 
   function onkeydown(event: KeyboardEvent) {
-    if (event.target instanceof HTMLInputElement || event.ctrlKey || event.altKey) return
+    if (event.target instanceof HTMLInputElement || event.ctrlKey || event.metaKey || event.altKey) return
     const key = event.key.toLowerCase()
     if (key === ' ') togglePlay()
     else if (key === 'i') start = Math.min(time, end - 0.1)

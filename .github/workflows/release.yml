@@ -1,4 +1,5 @@
-# Builds the Windows installers and attaches them to a GitHub Release.
+# Builds the installers and attaches them to a GitHub Release:
+#   Windows: NSIS setup.exe + MSI      macOS (untested): universal .dmg (Apple Silicon + Intel)
 # To release: bump the version (package.json, src-tauri/tauri.conf.json, src-tauri/Cargo.toml),
 # then push a tag like v0.1.0. The release is created as a draft; publish it on GitHub.
 name: Release
@@ -10,6 +11,23 @@ on:
 
 permissions:
   contents: write
+
+env:
+  TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+  RELEASE_BODY: |
+    ### Windows
+    **Download `Trimmy_*_x64-setup.exe`** and run it. No admin rights and nothing else to install.
+    (`Trimmy_*_x64_en-US.msi` is there too, for IT / Group Policy installs.)
+
+    Windows may show "Windows protected your PC" because the installer isn't code-signed yet:
+    click **More info** then **Run anyway**.
+
+    ### macOS (untested)
+    `Trimmy_*_universal.dmg` runs on Apple Silicon and Intel Macs (macOS 11+). **It is built
+    automatically but has never been tried on a real Mac**, so please report what happens.
+    It isn't notarized: after dragging Trimmy to Applications, open it once from
+    **System Settings → Privacy & Security → Open Anyway**, or run
+    `xattr -dr com.apple.quarantine /Applications/Trimmy.app`.
 
 jobs:
   windows:
@@ -30,27 +48,82 @@ jobs:
 
       - run: npm ci
 
-      # Also runs scripts/fetch-ffmpeg.mjs (the "pretauri" hook), which downloads the pinned,
-      # checksum-verified FFmpeg that gets bundled.
+      # Downloads the pinned, checksum-verified FFmpeg that gets bundled (also run by "pretauri").
+      - run: node scripts/fetch-ffmpeg.mjs
+
+      - name: Rust tests
+        working-directory: src-tauri
+        run: cargo test
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          tagName: ${{ env.TAG }}
           releaseName: Trimmy ${{ github.ref_name }}
-          releaseBody: |
-            **Download `Trimmy_*_x64-setup.exe`** and run it. No admin rights and nothing else to install.
-            (`Trimmy_*_x64_en-US.msi` is there too, for IT / Group Policy installs.)
-
-            Windows may show "Windows protected your PC" because the installer isn't code-signed yet:
-            click **More info** then **Run anyway**.
+          releaseBody: ${{ env.RELEASE_BODY }}
           releaseDraft: true
-          prerelease: false
 
       # Manual runs (no tag) still get downloadable installers from the run's summary page.
       - uses: actions/upload-artifact@v4
         with:
-          name: trimmy-installers
+          name: trimmy-windows
           path: |
             src-tauri/target/release/bundle/nsis/*.exe
             src-tauri/target/release/bundle/msi/*.msi
+
+  macos:
+    # After Windows, so both jobs add to the same draft release instead of racing to create it.
+    needs: windows
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      # Fetches both CPU builds of FFmpeg and joins them into universal binaries with lipo.
+      - run: node scripts/fetch-ffmpeg.mjs
+
+      - name: Rust tests
+        working-directory: src-tauri
+        run: cargo test
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ env.TAG }}
+          releaseName: Trimmy ${{ github.ref_name }}
+          releaseBody: ${{ env.RELEASE_BODY }}
+          releaseDraft: true
+          args: --target universal-apple-darwin
+
+      # The closest thing to testing we can do without a Mac in hand: the app bundle exists, holds
+      # both CPU architectures, and its bundled FFmpeg actually runs.
+      - name: Smoke-test the app bundle
+        run: |
+          app=src-tauri/target/universal-apple-darwin/release/bundle/macos/Trimmy.app
+          ls -la "$app/Contents/MacOS" "$app/Contents/Resources/licenses"
+          lipo -info "$app/Contents/MacOS/trimmy"
+          lipo -info "$app/Contents/MacOS/ffmpeg"
+          "$app/Contents/MacOS/ffmpeg" -hide_banner -version | head -n 1
+          "$app/Contents/MacOS/ffprobe" -hide_banner -version | head -n 1
+          codesign -dv "$app" 2>&1 | head -n 5
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trimmy-macos
+          path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg

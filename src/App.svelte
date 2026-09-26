@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { listen } from '@tauri-apps/api/event'
   import { getCurrentWebview } from '@tauri-apps/api/webview'
   import { open as pickFile } from '@tauri-apps/plugin-dialog'
   import Editor from './lib/Editor.svelte'
@@ -47,8 +48,15 @@
     return () => void unlisten.then((stop) => stop())
   })
 
+  // macOS sends Finder's "Open With" files to the running app as an event.
+  $effect(() => {
+    const unlisten = listen<string>('open-file', (event) => open(event.payload))
+    return () => void unlisten.then((stop) => stop())
+  })
+
   function onkeydown(event: KeyboardEvent) {
-    if (event.ctrlKey && event.key === 'o') {
+    // Ctrl+O on Windows, ⌘O on macOS.
+    if ((event.ctrlKey || event.metaKey) && event.key === 'o') {
       event.preventDefault()
       browse()
     }

@@ -6,6 +6,7 @@ mod probe;
 mod waveform;
 
 use std::path::Path;
+use std::sync::Mutex;
 
 use tauri::Manager;
 use tauri_plugin_shell::ShellExt;
@@ -18,7 +19,12 @@ use probe::VideoInfo;
 async fn open_video(app: tauri::AppHandle, path: String) -> Result<VideoInfo, String> {
     let file = Path::new(&path);
     if !file.is_absolute() {
-        return Err(r"Use the full path, like C:\Videos\clip.mp4".into());
+        let example = if cfg!(windows) {
+            r"C:\Videos\clip.mp4"
+        } else {
+            "/Users/you/Movies/clip.mp4"
+        };
+        return Err(format!("Use the full path, like {example}"));
     }
     if file.is_dir() {
         return Err("That's a folder, not a video file.".into());
@@ -76,14 +82,20 @@ async fn waveform(
     waveform::peaks(&app, &path, duration, buckets).await
 }
 
+/// A file macOS asked Trimmy to open (Finder's "Open With") that the UI hasn't picked up yet.
+#[derive(Default)]
+struct PendingOpen(Mutex<Option<String>>);
+
 /// The file Trimmy was started with ("Open with", or `trimmy.exe clip.mp4`), if any.
 #[tauri::command]
-fn launch_path() -> Option<String> {
-    std::env::args().nth(1)
+fn launch_path(pending: tauri::State<PendingOpen>) -> Option<String> {
+    let from_finder = pending.0.lock().ok().and_then(|mut p| p.take());
+    from_finder.or_else(|| std::env::args().nth(1))
 }
 
 fn main() {
     tauri::Builder::default()
+        .manage(PendingOpen::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
@@ -93,6 +105,20 @@ fn main() {
             waveform,
             launch_path
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Trimmy");
+        .build(tauri::generate_context!())
+        .expect("error while starting Trimmy")
+        .run(|_app, _event| {
+            // Windows passes "Open with" files as a command-line argument; macOS sends an event
+            // instead, possibly before the UI is ready, so keep it for launch_path too.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = _event {
+                if let Some(path) = urls.first().and_then(|url| url.to_file_path().ok()) {
+                    let path = path.to_string_lossy().into_owned();
+                    if let Ok(mut pending) = _app.state::<PendingOpen>().0.lock() {
+                        *pending = Some(path.clone());
+                    }
+                    let _ = tauri::Emitter::emit(_app, "open-file", path);
+                }
+            }
+        });
 }

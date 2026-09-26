@@ -1,24 +1,31 @@
 <script lang="ts">
+  import { isMac } from './video'
+
   let { onopen, onbrowse }: { onopen: (path: string) => void; onbrowse: () => void } = $props()
 
   let typed = $state('')
 
   function submit(event: SubmitEvent) {
     event.preventDefault()
-    // Explorer's "Copy as path" wraps the path in quotes.
-    const path = typed.trim().replace(/^"(.*)"$/, '$1')
+    // Explorer's "Copy as path" wraps the path in double quotes; macOS Terminal uses single quotes.
+    const path = typed.trim().replace(/^(["'])(.*)\1$/, '$2')
     if (path) onopen(path)
   }
 </script>
 
 <section>
-  <h1><span>$</span> trimmy</h1>
+  <h1>trimmy</h1>
   <p># drop a video here, paste its path, or browse for it</p>
   <form onsubmit={submit}>
-    <input bind:value={typed} placeholder="C:\path\to\clip.mp4" spellcheck="false" aria-label="Video file path" />
+    <input
+      bind:value={typed}
+      placeholder={isMac ? '/Users/you/Movies/clip.mp4' : 'C:\\path\\to\\clip.mp4'}
+      spellcheck="false"
+      aria-label="Video file path"
+    />
     <button class="primary" disabled={!typed.trim()}>open</button>
   </form>
-  <button type="button" onclick={onbrowse}>browse <kbd>ctrl+o</kbd></button>
+  <button type="button" onclick={onbrowse}>browse <kbd>{isMac ? '⌘o' : 'ctrl+o'}</kbd></button>
 </section>
 
 <style>
@@ -38,12 +45,7 @@
     font-size: 40px;
     font-weight: 800;
     color: var(--accent);
-    text-shadow: 0 0 18px rgb(83 252 24 / 0.35);
-  }
-
-  h1 span {
-    color: var(--muted);
-    text-shadow: none;
+    text-shadow: 0 0 18px rgb(83 252 24 / 0.175);
   }
 
   p {
