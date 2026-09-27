@@ -286,12 +286,22 @@ footer nav a::after { content: "]" / ""; color: var(--muted) }
 <summary>Is the download safe?</summary>
 <p>The installers are built from the public source code by GitHub Actions and attached to the GitHub release, which lists each file's SHA-256 checksum. Windows warns only because Trimmy isn't code-signed yet.</p>
 </details>
+<details id="privacy">
+<summary>What does Trimmy send over the network?</summary>
+<p>Almost nothing. It doesn't collect, store or send anything about you or your videos, and your files never leave your computer. The only request it makes is the update check: when it starts, it asks this project's GitHub releases whether there's a newer version. Like any web request, that shows GitHub your IP address. An update is downloaded only when you click <b>[update]</b>.</p>
+</details>
+</section>
+
+<section aria-labelledby="signing">
+<h2 id="signing">code signing policy</h2>
+<p>Windows releases are to be signed through the <a href="https://signpath.org">SignPath Foundation</a>'s free program for open-source projects: <i>free code signing provided by <a href="https://signpath.io">SignPath.io</a>, certificate by <a href="https://signpath.org">SignPath Foundation</a></i>. This applies from the first release after the project is approved; earlier releases are unsigned.</p>
+<p>Only binaries built from this project's source code by its <a href="{{repoUrl}}/blob/main/.github/workflows/release.yml">release workflow</a> are signed. Committer, reviewer and release approver: <a href="https://github.com/TuckerScottAlleborn">Tucker Scott Alleborn</a>, with two-factor authentication. Nothing is sent from your computer without your consent, apart from the update check described in the <a href="#privacy">privacy answer</a> above.</p>
 </section>
 </main>
 
 <footer>
 <!--if:donateUrl--><p>Trimmy is free. If it saved you some time, <a href="{{donateUrl}}">buy me a coffee</a>.</p><!--/if:donateUrl-->
-<nav aria-label="Trimmy on GitHub"><a href="{{repoUrl}}">source code</a> <a href="{{repoUrl}}/releases">all releases</a> <a href="{{repoUrl}}/issues">report a bug</a></nav>
+<nav aria-label="Trimmy on GitHub"><a href="{{repoUrl}}">source code</a> <a href="{{repoUrl}}/releases">all releases</a> <a href="{{repoUrl}}/issues">report a bug</a> <a href="#privacy">privacy</a> <a href="#signing">code signing policy</a></nav>
 <p>MIT license. Bundles <a href="https://ffmpeg.org">FFmpeg</a> (GPL v3). Made by <a href="https://www.tuckerscottalleborn.com/">Tucker Scott Alleborn</a>.</p>
 </footer>
 </body>

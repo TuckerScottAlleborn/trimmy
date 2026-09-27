@@ -371,8 +371,30 @@ update check against this repository's GitHub releases.
   from this repository. Every action is pinned to an exact commit, and FFmpeg is downloaded from
   pinned URLs and checked against SHA-256 hashes.
 
-The installers aren't code-signed with a paid certificate yet, which is why Windows and macOS
-warn on first install. Found a problem? Please report it privately through
+The installers aren't code-signed yet, which is why Windows and macOS warn on first install.
+
+### Privacy
+
+Trimmy doesn't collect, store or send anything about you or your videos. Your files never leave
+your computer. The one network request it makes is the update check: when it starts, it
+downloads `latest.json` from this repository's GitHub releases to see whether a newer version
+exists. Like any web request, that request reveals your IP address to GitHub
+([GitHub's privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement)).
+Nothing else is sent, and an update is downloaded only when you click **[update]**.
+
+### Code signing policy
+
+Windows releases are to be signed through the [SignPath Foundation](https://signpath.org)'s free
+program for open-source projects: *free code signing provided by
+[SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org)*.
+This applies from the first release after the project is approved; earlier releases are unsigned.
+
+- Only binaries built by this repository's [release workflow](.github/workflows/release.yml),
+  from this repository's source code, are signed. The bundled FFmpeg is built by third parties
+  (see [License](#license)).
+- **Committers and reviewers:** [Tucker Scott Alleborn](https://github.com/TuckerScottAlleborn)
+- **Approvers** (who approve each signing request): [Tucker Scott Alleborn](https://github.com/TuckerScottAlleborn)
+- Everyone in these roles uses two-factor authentication. Found a problem? Please report it privately through
 [GitHub security advisories](https://github.com/TuckerScottAlleborn/trimmy/security/advisories/new).
 
 ## Roadmap
@@ -385,7 +407,10 @@ warn on first install. Found a problem? Please report it privately through
 - Export for Discord (a size target, like under 10 MB)
 - GIF export
 - Confirm the macOS build on real Macs (help wanted), then notarize it
-- Linux builds
+- A Linux version (AppImage and .deb, probably; FFmpeg is already portable, but the preview
+  runs on WebKitGTK, whose video format support needs testing)
+- A custom installer: a Trimmy-styled setup window (the terminal look, the ghost) instead of the
+  stock NSIS wizard
 
 Simplicity is the feature. Anything that would add a second screen, a project file or a
 settings page probably doesn't belong here.
