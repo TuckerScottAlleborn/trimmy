@@ -1,0 +1,291 @@
+<!doctype html>
+<!--
+  The whole site. build.mjs fills in {{placeholders}} (title, description and the preview texts
+  are at the top of build.mjs; version and download links come from the latest release) and
+  drops each if:key block whose key is empty. No JavaScript: keep it that way.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{title}}</title>
+<meta name="description" content="{{description}}">
+<link rel="canonical" href="{{url}}">
+<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+<!--
+  Link previews. Open Graph covers Discord, Bluesky, iMessage, Slack, WhatsApp, Telegram, Signal,
+  Facebook, LinkedIn, Reddit, Mastodon and Teams. X needs twitter:card and takes the rest from
+  og:*. X shows only the picture, which is why og.png spells out the name and tagline itself.
+  summary_large_image also gets Discord to show the big picture instead of a thumbnail.
+-->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Trimmy">
+<meta property="og:url" content="{{url}}">
+<meta property="og:title" content="{{ogTitle}}">
+<meta property="og:description" content="{{ogDescription}}">
+<meta property="og:image" content="{{ogImage}}">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="{{ogImageAlt}}">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="{{ogImageAlt}}">
+<!--if:version-->
+<!-- Slack lists these under the preview. -->
+<meta name="twitter:label1" content="Latest version">
+<meta name="twitter:data1" content="v{{version}}">
+<meta name="twitter:label2" content="Price">
+<meta name="twitter:data2" content="Free">
+<!--/if:version-->
+<!-- Also the color of the stripe down the side of a Discord embed. -->
+<meta name="theme-color" content="#53fc18">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preload" href="fonts/jetbrains-mono-800.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin>
+<script type="application/ld+json">{{{jsonLd}}}</script>
+<style>
+/* The app's look (src/app.css): monospace, Kick green on near-black, [bracket] buttons. */
+:root {
+  color-scheme: dark;
+  --bg: #0a0d0e;
+  --fg: #e9f5ea;
+  --dim: #a9b8ae;
+  --muted: #74847a;
+  --line: #243029;
+  --accent: #53fc18;
+  --accent-soft: rgb(83 252 24 / 0.14);
+}
+
+/* "optional": if the font hasn't arrived by first paint, this visit keeps the system monospace
+   rather than swapping fonts under the reader. It's preloaded and 7 KB, so it nearly always makes it. */
+@font-face { font-family: "JetBrains Mono"; font-weight: 400; font-display: optional; src: url(fonts/jetbrains-mono-400.woff2) format("woff2") }
+@font-face { font-family: "JetBrains Mono"; font-weight: 800; font-display: optional; src: url(fonts/jetbrains-mono-800.woff2) format("woff2") }
+
+*, ::before, ::after { box-sizing: border-box }
+
+html {
+  background: var(--bg);
+  color: var(--dim);
+  font: 15px/1.65 "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+@media (min-width: 48rem) {
+  html { font-size: 16px }
+}
+
+body {
+  margin: 0;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(2rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+}
+
+main, footer { max-width: 61rem; margin: 0 auto }
+section { max-width: 44rem; margin: 3.5rem auto 0 }
+p, ul, ol, figure { margin: 0 }
+img, svg { display: block; max-width: 100% }
+b { color: var(--fg); font-weight: 800 }
+code { font: inherit; color: var(--fg); overflow-wrap: anywhere }
+
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 0.2em }
+a:hover { background: var(--accent-soft) }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px }
+::selection { background: var(--accent); color: var(--bg) }
+
+/* The top of the page is the app's open screen: a dashed drop zone. */
+.hero {
+  max-width: none;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: clamp(2rem, 8vw, 4.5rem) 1rem;
+  border: 1px dashed var(--line);
+  text-align: center;
+}
+
+.ghost { width: 108px; height: 100px }
+
+h1 {
+  margin: 0;
+  color: var(--accent);
+  font-size: clamp(3.25rem, 16vw, 6rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  text-shadow: 0 0 0.3em rgb(83 252 24 / 0.3);
+}
+
+h1 span {
+  display: block;
+  margin-top: 0.9rem;
+  color: var(--fg);
+  font-size: clamp(1rem, 4.4vw, 1.5rem);
+  font-weight: 400;
+  line-height: 1.35;
+  letter-spacing: 0;
+  text-shadow: none;
+  text-wrap: balance;
+}
+
+/* Phones held sideways: keep the download button on the first screen. */
+@media (orientation: landscape) and (max-height: 30rem) {
+  .hero { padding-block: 1.5rem; gap: 0.75rem }
+  .ghost { width: 64.8px; height: 60px }
+  h1 { font-size: 3.5rem }
+}
+
+.c { color: var(--muted) }
+.c::before { content: "# " / "" }
+.how { text-wrap: balance }
+
+.btn {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.8rem 1.4rem;
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: 0 0 1.5rem rgb(83 252 24 / 0.25);
+}
+
+.btn::before { content: "[ " / "" }
+.btn::after { content: " ]" / "" }
+.btn:hover { background: #8dff5e }
+
+.meta, .more { font-size: 0.875rem }
+.meta { color: var(--muted) }
+.more a { display: inline-block; padding: 0.3rem 0 }
+/* "a · b · c" that wraps after a dot, never before one. */
+.dots span { white-space: nowrap }
+.dots span:not(:last-child)::after { content: " ·" / ""; color: var(--muted) }
+
+.shot { margin-top: 2rem }
+.shot img { width: 100%; height: auto; box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 0.6), 0 0 0 1px var(--line) }
+
+h2 { margin: 0 0 1rem; color: var(--accent); font-size: 1.125rem; font-weight: 800 }
+h2::before { content: "## " / ""; color: var(--muted) }
+
+ul, ol { padding: 0; list-style: none }
+li + li { margin-top: 0.6rem }
+ul li { padding-left: 2ch; text-indent: -2ch }
+ul li::before { content: "+ " / ""; color: var(--accent) }
+ol { counter-reset: step }
+ol li { padding-left: 3ch; text-indent: -3ch; counter-increment: step }
+ol li::before { content: counter(step) ". " / ""; color: var(--accent) }
+.after { margin-top: 1rem }
+
+.nope { display: flex; flex-wrap: wrap; gap: 0.2rem 1.4rem; margin-bottom: 1rem }
+.nope s { color: var(--muted); text-decoration: line-through 2px var(--accent) }
+
+details { border-top: 1px solid var(--line) }
+details:last-child { border-bottom: 1px solid var(--line) }
+summary { padding: 0.7rem 0 0.7rem 2ch; text-indent: -2ch; color: var(--fg); cursor: pointer; list-style: none }
+summary::-webkit-details-marker { display: none }
+summary::before { content: "+ " / ""; color: var(--accent) }
+details[open] summary::before { content: "- " / "" }
+summary:hover { color: var(--accent) }
+details p { padding: 0 0 1rem 2ch }
+
+footer {
+  margin-top: 4rem;
+  padding-top: 1.5rem;
+  border-top: 1px dashed var(--line);
+  display: grid;
+  gap: 0.75rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 1.25rem }
+footer nav a { padding: 0.35rem 0; text-decoration: none }
+footer nav a::before { content: "[" / ""; color: var(--muted) }
+footer nav a::after { content: "]" / ""; color: var(--muted) }
+</style>
+</head>
+<body>
+<main>
+<section class="hero" aria-labelledby="name">
+<svg class="ghost" viewBox="-0.4 0 10.8 10" width="108" height="100" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><defs><path id="g" d="M3 0h4v1h2v1h1v8H9V9H8v1H6V9H4v1H2V9H1v1H0V2h1V1h2z"/></defs><use href="#g" x="-0.35" fill="#ff2bd6"/><use href="#g" x="0.35" fill="#00e5ff"/><use href="#g" fill="#53fc18"/><path fill="#fff" d="M2 3h2v1H3v1H2zm4 0h2v1H7v1H6z"/><path fill="#041000" d="M3 4h1v1H3zm4 0h1v1H7z"/></svg>
+<h1 id="name">trimmy <span>a comically simple video trimmer</span></h1>
+<p class="how c">open a clip. drag the start and end. export. that's the whole app.</p>
+<a class="btn" href="{{winUrl}}">download for windows</a>
+<p class="meta dots"><!--if:version--><span>v{{version}}</span> <span>{{winSize}}</span> <!--/if:version--><span>windows 10 &amp; 11</span> <span>free, open source</span></p>
+<p class="more dots"><!--if:macUrl--><span><a href="{{macUrl}}">macos (untested)</a></span> <!--/if:macUrl--><!--if:msiUrl--><span><a href="{{msiUrl}}">msi</a></span> <!--/if:msiUrl--><span><a href="{{notesUrl}}">release notes</a></span></p>
+</section>
+
+<figure class="shot">
+<picture>
+<source type="image/avif" srcset="img/screenshot-640.avif 640w, img/screenshot-976.avif 976w" sizes="(min-width: 63rem) 976px, calc(100vw - 2rem)">
+<img src="img/screenshot-976.webp" srcset="img/screenshot-640.webp 640w, img/screenshot-976.webp 976w" sizes="(min-width: 63rem) 976px, calc(100vw - 2rem)" width="976" height="679" fetchpriority="high" alt="Trimmy with a gameplay clip open: the video, a green audio waveform with the start and end handles, and the play and export buttons.">
+</picture>
+</figure>
+
+<section aria-labelledby="does">
+<h2 id="does">what it does</h2>
+<ul role="list">
+<li><b>Opens any common video.</b> MP4, MKV, MOV, WebM, AVI, TS, WMV, FLV and more, in H.264, HEVC, AV1 or VP9.</li>
+<li><b>Four ways in:</b> drag it onto the window, paste its path, browse (Ctrl+O), or right-click it and pick Open with.</li>
+<li><b>Shows the waveform,</b> so you can see where the shot, the kill or the shout is.</li>
+<li><b>Exports in about a second</b> with zero quality loss, because it doesn't re-encode.</li>
+<li><b>Keeps every audio track,</b> so game audio and your mic both come through.</li>
+<li><b>Never touches the original.</b> Your clip is saved next to it as <code>name_trimmed.mp4</code>.</li>
+<li><b>Stays on your PC.</b> No account, no upload, no watermark.</li>
+</ul>
+</section>
+
+<section aria-labelledby="doesnt">
+<h2 id="doesnt">what it doesn't do</h2>
+<p class="nope"><s>titles</s> <s>transitions</s> <s>filters</s> <s>music</s> <s>stickers</s> <s>multiple clips</s> <s>tracks</s> <s>projects</s> <s>accounts</s> <s>ai</s></p>
+<p><b>It trims. That's it.</b> Made for NVIDIA ShadowPlay, AMD ReLive, OBS and Xbox Game Bar recordings, when all you want is the good ten seconds.</p>
+</section>
+
+<section aria-labelledby="install">
+<h2 id="install">install</h2>
+<ol role="list">
+<li><a href="{{winUrl}}">Download <code>{{winName}}</code></a><!--if:version--> ({{winSize}}, mostly FFmpeg)<!--/if:version-->.</li>
+<li>Run it. It installs just for you: no admin prompt, nothing else to install.</li>
+<li>If Windows says <b>"Windows protected your PC"</b>, click <b>More info</b>, then <b>Run anyway</b>. Trimmy isn't code-signed yet (a certificate costs money every year), so Windows is wary of it like any new download.</li>
+</ol>
+<p class="after c">needs windows 10 or 11, 64-bit. uninstall from settings &gt; apps.</p>
+</section>
+
+<section aria-labelledby="faq">
+<h2 id="faq">faq</h2>
+<details>
+<summary>Is it really free?</summary>
+<p>Yes. Trimmy is free and open source (MIT license): no ads, no account, no trial, no watermark.</p>
+</details>
+<details>
+<summary>Does trimming lose quality?</summary>
+<p>No. Trimmy copies the original video and audio into the new file as they are (an FFmpeg stream copy) instead of re-encoding them. That's also why it only takes a second.</p>
+</details>
+<details>
+<summary>Why does my clip start a bit before my start handle?</summary>
+<p>A stream copy can only start on a keyframe, so the clip starts at the last one before your handle: about a second early for ShadowPlay recordings, up to several seconds with OBS's default settings. The end is always exact. A frame-exact mode is on the roadmap.</p>
+</details>
+<details>
+<summary>Is there a Mac or Linux version?</summary>
+<p>There's a macOS build for Apple Silicon and Intel (macOS 11 or later), but nobody has tried it on a real Mac yet. The <a href="{{repoUrl}}#macos-untested">macOS notes</a> say how to open it<!--if:macUrl--> (<a href="{{macUrl}}">download the .dmg</a>)<!--/if:macUrl-->; please <a href="{{repoUrl}}/issues">report back</a> either way. No Linux build yet.</p>
+</details>
+<details>
+<summary>Is the download safe?</summary>
+<p>The installers are built from the public source code by GitHub Actions and attached to the GitHub release, which lists each file's SHA-256 checksum. Windows warns only because Trimmy isn't code-signed yet.</p>
+</details>
+</section>
+</main>
+
+<footer>
+<!--if:donateUrl--><p>Trimmy is free. If it saved you some time, <a href="{{donateUrl}}">buy me a coffee</a>.</p><!--/if:donateUrl-->
+<nav aria-label="Trimmy on GitHub"><a href="{{repoUrl}}">source code</a> <a href="{{repoUrl}}/releases">all releases</a> <a href="{{repoUrl}}/issues">report a bug</a></nav>
+<p>MIT license. Bundles <a href="https://ffmpeg.org">FFmpeg</a> (GPL v3). Made by <a href="https://www.tuckerscottalleborn.com/">Tucker Scott Alleborn</a>.</p>
+</footer>
+</body>
+</html>
