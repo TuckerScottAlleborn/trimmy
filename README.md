@@ -76,6 +76,16 @@ costs money every year), so Windows SmartScreen warns about any new download lik
 - That's all. Trimmy needs Microsoft's WebView2, which every up-to-date Windows 10 and 11
   PC already has; if yours somehow doesn't, the installer adds it.
 
+### Updating
+
+Trimmy checks GitHub for a newer version when it starts, and nothing else. If there is one, the
+open screen says `# update available: vX.Y.Z` with an **[update]** button. **Nothing is
+downloaded or installed unless you click it.** Clicking downloads the new version, verifies its
+signature (so only updates built by this project's release workflow are accepted), installs it,
+and restarts Trimmy. Offline, or no update? You'll see nothing at all.
+
+Your installed version is shown faintly in the bottom-right corner of the open screen.
+
 ### Uninstalling
 
 **Settings → Apps → Installed apps → Trimmy → Uninstall.** Your videos and exported clips are
@@ -309,6 +319,7 @@ To regenerate the icons after editing `src-tauri/icons/icon.svg`:
 ## Releasing
 
 1. Bump the version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`.
+   Installed copies only offer an update when this number goes up.
 2. Commit, then tag and push: `git tag v0.2.0 && git push origin v0.2.0`.
 3. The [Release workflow](.github/workflows/release.yml) builds the Windows installers, then
    the universal macOS `.dmg` (running the Rust tests and a smoke test of the app bundle on a
@@ -318,8 +329,50 @@ To regenerate the icons after editing `src-tauri/icons/icon.svg`:
 You can also run the workflow by hand from the **Actions** tab; the installers are then
 attached to that run as a downloadable artifact instead.
 
+Publishing is what ships an update: installed copies read
+`releases/latest/download/latest.json`, which only ever points at the newest **published**
+release, so drafts are invisible to them.
+
+### The update signing key
+
+Updates are signed with a [minisign](https://jedisct1.github.io/minisign/) key pair that Tauri
+generates (`npx tauri signer generate`). It is not a code-signing certificate and costs nothing.
+
+- The **public key** is in `src-tauri/tauri.conf.json` (`plugins.updater.pubkey`). It's meant to
+  be public: it can only check signatures.
+- The **private key and its password** are secrets in the repository's `release` environment
+  (`TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`), which only `v*` tags and
+  `main` can use. They are never in this repository, and nobody who uses or downloads Trimmy
+  ever sees them. Keep an offline backup: **if the private key is lost, installed copies can
+  never auto-update again** (people would have to reinstall by hand once).
+- Local `npm run tauri build` doesn't need the key; only CI builds the signed update files
+  (`src-tauri/tauri.updater.conf.json`).
+
+## Security
+
+Trimmy has no accounts, no servers and no telemetry. The only network request it makes is the
+update check against this repository's GitHub releases.
+
+- **Your files stay on your machine.** Trimmy only reads the video you open and writes the clip
+  next to it. The Rust side remembers which files you opened and refuses to run FFmpeg on any
+  other path, so even a compromised UI couldn't point it elsewhere.
+- **Locked-down UI.** A strict Content Security Policy blocks remote scripts, and the UI can
+  only call Trimmy's own commands. It has no general shell or file-system access.
+- **Updates are signed.** Installed copies only accept an update carrying a valid signature from
+  this project's key, only when the version number goes up, and only after you click
+  **[update]**. A tampered download is refused.
+- **Reproducible pipeline.** Installers are built by [GitHub Actions](.github/workflows/release.yml)
+  from this repository. Every action is pinned to an exact commit, and FFmpeg is downloaded from
+  pinned URLs and checked against SHA-256 hashes.
+
+The installers aren't code-signed with a paid certificate yet, which is why Windows and macOS
+warn on first install. Found a problem? Please report it privately through
+[GitHub security advisories](https://github.com/TuckerScottAlleborn/trimmy/security/advisories/new).
+
 ## Roadmap
 
+- A slim FFmpeg build with only what Trimmy uses: a ~10 MB installer instead of ~60 MB, and a
+  faster first open after a reboot ([design notes](docs/future-slim-ffmpeg.md))
 - Precise (frame-exact) export, GPU-accelerated
 - Preview for formats WebView2 can't play (HEVC without the extension, TS, AVI)
 - Remove audio / pick which audio track to keep

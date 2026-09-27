@@ -20,14 +20,53 @@ pub async fn export(
     if !(start >= 0.0 && length > 0.0) {
         return Err("Pick a start that comes before the end.".into());
     }
-    let output = output_path(Path::new(input), |p| p.exists());
+    let output = reserve_output(Path::new(input))?;
     let output_str = output.to_string_lossy().into_owned();
+    let result = run_ffmpeg(app, input, start, length, &output_str).await;
+    if result.is_err() {
+        // Only ever deletes the file this export reserved, never someone else's.
+        let _ = std::fs::remove_file(&output);
+    }
+    result.map(|()| output_str)
+}
 
+/// Claims the output name by creating the file, so a file that appears in the meantime (another
+/// export, a sync client) is never overwritten or deleted.
+fn reserve_output(input: &Path) -> Result<PathBuf, String> {
+    loop {
+        let candidate = output_path(input, |p| p.exists());
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&candidate)
+        {
+            Ok(_) => return Ok(candidate),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(format!("Couldn't create {}: {e}", candidate.display())),
+        }
+    }
+}
+
+async fn run_ffmpeg(
+    app: &tauri::AppHandle,
+    input: &str,
+    start: f64,
+    length: f64,
+    output: &str,
+) -> Result<(), String> {
     let (mut events, _child) = app
         .shell()
         .sidecar("ffmpeg")
         .map_err(|e| e.to_string())?
-        .args(["-hide_banner", "-nostdin", "-loglevel", "error", "-nostats"])
+        // -y: the output is the empty file reserve_output just created for this export.
+        .args([
+            "-hide_banner",
+            "-nostdin",
+            "-loglevel",
+            "error",
+            "-nostats",
+            "-y",
+        ])
         .args(["-progress", "pipe:1"])
         .args([
             "-ss",
@@ -40,7 +79,7 @@ pub async fn export(
         // First video track plus every audio track (game + mic stay separate).
         .args(["-map", "0:v:0", "-map", "0:a?", "-c", "copy"])
         .args(["-avoid_negative_ts", "make_zero", "-map_metadata", "0"])
-        .arg(&output_str)
+        .arg(output)
         .spawn()
         .map_err(|e| e.to_string())?;
 
@@ -58,12 +97,11 @@ pub async fn export(
                 }
             }
             CommandEvent::Stderr(line) => errors.push_str(&String::from_utf8_lossy(&line)),
-            CommandEvent::Terminated(status) if status.code == Some(0) => return Ok(output_str),
+            CommandEvent::Terminated(status) if status.code == Some(0) => return Ok(()),
             CommandEvent::Terminated(_) => break,
             _ => {}
         }
     }
-    let _ = std::fs::remove_file(&output);
     Err(format!("Export failed: {}", errors.trim()))
 }
 

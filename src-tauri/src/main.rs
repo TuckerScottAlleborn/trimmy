@@ -5,6 +5,7 @@ mod export;
 mod probe;
 mod waveform;
 
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -13,10 +14,28 @@ use tauri_plugin_shell::ShellExt;
 
 use probe::VideoInfo;
 
+/// Files that passed `open_video`. The other commands only ever touch these, so even a
+/// compromised UI can't point FFmpeg at arbitrary paths, URLs or FFmpeg protocols.
+#[derive(Default)]
+struct OpenedFiles(Mutex<HashSet<String>>);
+
+impl OpenedFiles {
+    fn check(&self, path: &str) -> Result<(), String> {
+        match self.0.lock() {
+            Ok(opened) if opened.contains(path) => Ok(()),
+            _ => Err("Open that video in Trimmy first.".into()),
+        }
+    }
+}
+
 /// Checks that `path` is a video FFmpeg can read, lets the webview load it for the preview,
 /// and returns what the UI shows about it.
 #[tauri::command]
-async fn open_video(app: tauri::AppHandle, path: String) -> Result<VideoInfo, String> {
+async fn open_video(
+    app: tauri::AppHandle,
+    opened: tauri::State<'_, OpenedFiles>,
+    path: String,
+) -> Result<VideoInfo, String> {
     let file = Path::new(&path);
     if !file.is_absolute() {
         let example = if cfg!(windows) {
@@ -57,6 +76,9 @@ async fn open_video(app: tauri::AppHandle, path: String) -> Result<VideoInfo, St
     app.asset_protocol_scope()
         .allow_file(file)
         .map_err(|e| e.to_string())?;
+    if let Ok(mut opened) = opened.0.lock() {
+        opened.insert(path);
+    }
     Ok(info)
 }
 
@@ -64,10 +86,12 @@ async fn open_video(app: tauri::AppHandle, path: String) -> Result<VideoInfo, St
 #[tauri::command]
 async fn export_clip(
     app: tauri::AppHandle,
+    opened: tauri::State<'_, OpenedFiles>,
     path: String,
     start: f64,
     end: f64,
 ) -> Result<String, String> {
+    opened.check(&path)?;
     export::export(&app, &path, start, end).await
 }
 
@@ -75,10 +99,12 @@ async fn export_clip(
 #[tauri::command]
 async fn waveform(
     app: tauri::AppHandle,
+    opened: tauri::State<'_, OpenedFiles>,
     path: String,
     duration: f64,
     buckets: u32,
 ) -> Result<Vec<f32>, String> {
+    opened.check(&path)?;
     waveform::peaks(&app, &path, duration, buckets).await
 }
 
@@ -93,17 +119,58 @@ fn launch_path(pending: tauri::State<PendingOpen>) -> Option<String> {
     from_finder.or_else(|| std::env::args().nth(1))
 }
 
+/// The window starts hidden (no flash of an empty frame); the UI calls this once it has drawn.
+#[tauri::command]
+fn ui_ready(window: tauri::WebviewWindow) {
+    let _ = window.show();
+    let _ = window.set_focus();
+}
+
+/// Runs ffprobe and ffmpeg once in the background so the OS has the (large) executables cached
+/// before the user opens a file. The first run after a reboot is otherwise ~1 s slower.
+fn warm_up_ffmpeg(app: tauri::AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        for tool in ["ffprobe", "ffmpeg"] {
+            if let Ok(command) = app.shell().sidecar(tool) {
+                let _ = command.arg("-version").output().await;
+            }
+        }
+    });
+}
+
+/// Shows the window after a few seconds if the UI never called `ui_ready` (for example, a
+/// frontend error), so Trimmy can't end up running invisibly.
+fn show_window_eventually(app: tauri::AppHandle) {
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(3));
+        if let Some(window) = app.get_webview_window("main") {
+            if !window.is_visible().unwrap_or(true) {
+                let _ = window.show();
+            }
+        }
+    });
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(PendingOpen::default())
+        .manage(OpenedFiles::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .setup(|app| {
+            warm_up_ffmpeg(app.handle().clone());
+            show_window_eventually(app.handle().clone());
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             open_video,
             export_clip,
             waveform,
-            launch_path
+            launch_path,
+            ui_ready
         ])
         .build(tauri::generate_context!())
         .expect("error while starting Trimmy")

@@ -1,15 +1,42 @@
 <script lang="ts">
+  import { installUpdate, type Update } from './update'
   import { isMac } from './video'
 
-  let { onopen, onbrowse }: { onopen: (path: string) => void; onbrowse: () => void } = $props()
+  let {
+    onopen,
+    onbrowse,
+    version,
+    update,
+  }: {
+    onopen: (path: string) => void
+    onbrowse: () => void
+    /** This build's version, shown faintly in the corner. */
+    version: string
+    /** A newer release, if GitHub has one. Only offered; installed when the user clicks. */
+    update: Update | null
+  } = $props()
 
   let typed = $state('')
+  /** What the update line says once the user has clicked [update]. */
+  let updating = $state('')
 
   function submit(event: SubmitEvent) {
     event.preventDefault()
     // Explorer's "Copy as path" wraps the path in double quotes; macOS Terminal uses single quotes.
     const path = typed.trim().replace(/^(["'])(.*)\1$/, '$2')
     if (path) onopen(path)
+  }
+
+  async function runUpdate(target: Update) {
+    updating = 'downloading...'
+    try {
+      await installUpdate(target, (fraction) => {
+        updating = fraction === null ? 'downloading...' : `downloading ${Math.round(fraction * 100)}%`
+      })
+      updating = 'restarting...'
+    } catch (e) {
+      updating = `update failed: ${e}`
+    }
   }
 </script>
 
@@ -25,11 +52,27 @@
     />
     <button class="primary" disabled={!typed.trim()}>open</button>
   </form>
-  <button type="button" onclick={onbrowse}>browse <kbd>{isMac ? '⌘o' : 'ctrl+o'}</kbd></button>
+  <div class="browse">
+    <button type="button" onclick={onbrowse}>browse</button>
+    <kbd>{isMac ? '⌘o' : 'ctrl+o'}</kbd>
+  </div>
+
+  <footer>
+    <span class="update">
+      {#if updating}
+        # {updating}
+      {:else if update}
+        # update available: v{update.version}
+        <button type="button" onclick={() => runUpdate(update)}>update</button>
+      {/if}
+    </span>
+    {#if version}<span class="version">v{version}</span>{/if}
+  </footer>
 </section>
 
 <style>
   section {
+    position: relative;
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -64,9 +107,35 @@
     min-width: 0;
   }
 
+  .browse {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
   kbd {
-    margin-left: 6px;
     font: inherit;
     color: var(--muted);
+  }
+
+  footer {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+  }
+
+  .update {
+    color: var(--muted);
+  }
+
+  /* Barely there: for bug reports, not for reading. */
+  .version {
+    color: var(--muted);
+    opacity: 0.4;
   }
 </style>

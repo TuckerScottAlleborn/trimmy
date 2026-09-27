@@ -2,6 +2,8 @@
 #   Windows: NSIS setup.exe + MSI      macOS (untested): universal .dmg (Apple Silicon + Intel)
 # To release: bump the version (package.json, src-tauri/tauri.conf.json, src-tauri/Cargo.toml),
 # then push a tag like v0.1.0. The release is created as a draft; publish it on GitHub.
+# Every action is pinned to a full commit SHA (tag in the comment): the release jobs hold the
+# update signing key, so a moved tag must not be able to change what runs here.
 name: Release
 
 on:
@@ -32,17 +34,23 @@ env:
 jobs:
   windows:
     runs-on: windows-latest
+    # The signing key lives in this environment, which only v* tags and main may use.
+    environment: release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           cache: npm
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: stable
 
-      - uses: swatinem/rust-cache@v2
+      - uses: swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: src-tauri
 
@@ -55,17 +63,24 @@ jobs:
         working-directory: src-tauri
         run: cargo test
 
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signs the update files so installed copies can trust them (see README: Releasing).
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ env.TAG }}
           releaseName: Trimmy ${{ github.ref_name }}
           releaseBody: ${{ env.RELEASE_BODY }}
           releaseDraft: true
+          # Also build the signed update files and latest.json (kept out of local builds, which
+          # have no signing key). Windows updates use the per-user setup.exe, not the MSI.
+          args: --config src-tauri/tauri.updater.conf.json
+          updaterJsonPreferNsis: true
 
       # Manual runs (no tag) still get downloadable installers from the run's summary page.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: trimmy-windows
           path: |
@@ -76,19 +91,23 @@ jobs:
     # After Windows, so both jobs add to the same draft release instead of racing to create it.
     needs: windows
     runs-on: macos-latest
+    environment: release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           cache: npm
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
         with:
+          toolchain: stable
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 
-      - uses: swatinem/rust-cache@v2
+      - uses: swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: src-tauri
 
@@ -101,15 +120,18 @@ jobs:
         working-directory: src-tauri
         run: cargo test
 
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signs the update files so installed copies can trust them (see README: Releasing).
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ env.TAG }}
           releaseName: Trimmy ${{ github.ref_name }}
           releaseBody: ${{ env.RELEASE_BODY }}
           releaseDraft: true
-          args: --target universal-apple-darwin
+          args: --target universal-apple-darwin --config src-tauri/tauri.updater.conf.json
 
       # The closest thing to testing we can do without a Mac in hand: the app bundle exists, holds
       # both CPU architectures, and its bundled FFmpeg actually runs.
@@ -123,7 +145,7 @@ jobs:
           "$app/Contents/MacOS/ffprobe" -hide_banner -version | head -n 1
           codesign -dv "$app" 2>&1 | head -n 5
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: trimmy-macos
           path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg

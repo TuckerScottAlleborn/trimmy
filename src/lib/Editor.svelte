@@ -29,7 +29,27 @@
 
   function seek(t: number) {
     time = Math.max(0, Math.min(video.duration, t))
+    scrubTo = null
     player.currentTime = time
+  }
+
+  /** Where a timeline drag wants the video to be; applied at most once per frame. */
+  let scrubTo: number | null = null
+
+  // Dragging fires far more often than a video can seek, and piling up seeks makes long files
+  // stutter. The playhead follows the mouse right away; the video catches up with the latest
+  // position whenever its previous seek has finished.
+  function scrub(t: number) {
+    time = Math.max(0, Math.min(video.duration, t))
+    if (scrubTo === null) requestAnimationFrame(applyScrub)
+    scrubTo = time
+  }
+
+  function applyScrub() {
+    if (scrubTo === null) return
+    if (player.seeking) return void requestAnimationFrame(applyScrub)
+    player.currentTime = scrubTo
+    scrubTo = null
   }
 
   function togglePlay() {
@@ -111,7 +131,7 @@
   <p class="error">! can't preview this file yet, but you can still trim and export it</p>
 {/if}
 
-<Timeline duration={video.duration} {time} {peaks} step={frame} bind:start bind:end onseek={seek} />
+<Timeline duration={video.duration} {time} {peaks} step={frame} bind:start bind:end onseek={scrub} />
 
 <div class="controls">
   <button class="play" onclick={togglePlay}>{paused ? 'play' : 'stop'}</button>

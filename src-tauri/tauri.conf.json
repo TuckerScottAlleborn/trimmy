@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Trimmy",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "identifier": "io.github.tuckerscottalleborn.trimmy",
   "build": {
     "frontendDist": "../dist",
@@ -19,15 +19,36 @@
         "minHeight": 400,
         "center": true,
         "theme": "Dark",
-        "backgroundColor": "#0a0d0e"
+        "backgroundColor": "#0a0d0e",
+        "visible": false
       }
     ],
     "security": {
-      "csp": null,
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "style-src": "'self'",
+        "font-src": "'self' data:",
+        "img-src": "'self' data:",
+        "media-src": "'self' asset: http://asset.localhost",
+        "connect-src": "ipc: http://ipc.localhost",
+        "object-src": "'none'",
+        "base-uri": "'none'",
+        "form-action": "'none'",
+        "frame-ancestors": "'none'"
+      },
+      "devCsp": null,
       "assetProtocol": {
         "enable": true,
         "scope": []
       }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEUwQjhDOTI4QTU2MTMyRUYKUldUdk1tR2xLTW00NEtjdmRiblNEM2JaeUE1cEpUYllISldhRVRybXRQQ0hrRjhjTnlaTGR1VUwK",
+      "endpoints": ["https://github.com/TuckerScottAlleborn/trimmy/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
     }
   },
   "bundle": {
