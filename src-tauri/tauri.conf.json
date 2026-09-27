@@ -58,8 +58,8 @@
     "copyright": "Copyright (c) 2026 Tucker Scott Alleborn. MIT License.",
     "homepage": "https://github.com/TuckerScottAlleborn/trimmy",
     "category": "Video",
-    "shortDescription": "Comically simple video trimmer",
-    "longDescription": "Open a video, drag the start and end, export. Lossless and fast. Made for game clips.",
+    "shortDescription": "A video trimmer. That's it.",
+    "longDescription": "Open a video, drag the start and end, export. Lossless and fast. Made with game clips in mind; works on just about any video.",
     "licenseFile": "../LICENSE",
     "icon": [
       "icons/32x32.png",

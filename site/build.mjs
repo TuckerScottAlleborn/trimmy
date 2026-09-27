@@ -26,14 +26,14 @@ const REPO_URL = `https://github.com/${REPO}`
 const DONATE_URL = ''
 
 // What search results and link previews say. This is the only place these texts live.
-const TITLE = 'Trimmy: a comically simple video trimmer for Windows'
+const TITLE = "Trimmy: a free video trimmer for Windows. That's it."
 const DESCRIPTION =
-  'Open a clip, drag the start and end, export. Trimmy trims ShadowPlay, ReLive and OBS clips in about a second with zero quality loss. Free for Windows.'
-const OG_TITLE = 'Trimmy: a comically simple video trimmer'
+  'Free video trimmer for Windows. No login, no paid features, no watermark. Trims any video, from game clips to phone videos, losslessly in about a second.'
+const OG_TITLE = "Trimmy: a video trimmer. That's it."
 const OG_DESCRIPTION =
-  "Open a clip. Drag the start and end. Export. That's the whole app. Free, lossless and made for game clips."
+  'Open a video, drag the start and end, export. Free, with no login, no paid features, no ads and no watermark. Made with game clips in mind; works on just about any video.'
 const OG_IMAGE_ALT =
-  'Glitch the pixel ghost above the word trimmy, the tagline "a comically simple video trimmer" and a green audio waveform between two trim handles.'
+  'Glitch the pixel ghost above the word trimmy, the tagline "a video trimmer. that\'s it.", a green audio waveform between two trim handles, and "free, no login, no paid features, no watermark".'
 
 // index.html, gzipped, has to fit in the first round trip of a new connection (about 14 KB), so
 // the browser can draw the page before anything else arrives.
@@ -192,7 +192,7 @@ ${d.macUrl ? `- macOS build (Apple Silicon and Intel, untested): ${d.macUrl}\n` 
     : ''
   return `# Trimmy
 
-> A comically simple video trimmer for Windows: open one video, drag the start and end, export. Lossless and near-instant (an FFmpeg stream copy, no re-encoding). Free and open source (MIT). Made for game clips from NVIDIA ShadowPlay, AMD ReLive, OBS and Xbox Game Bar.
+> A video trimmer. That's it. Trimmy is free for Windows, with no login, no paid features, no ads and no watermark: open one video, drag the start and end, export. Lossless and near-instant (an FFmpeg stream copy, no re-encoding). Open source (MIT). Made with game clips in mind (NVIDIA ShadowPlay, AMD ReLive, OBS, Xbox Game Bar), and works on just about any video: phone videos, screen recordings, downloads.
 
 ${get}- All releases: ${REPO_URL}/releases
 
@@ -202,7 +202,8 @@ ${get}- All releases: ${REPO_URL}/releases
 - Shows the audio waveform on a timeline with start and end handles
 - Exports in about a second with no quality loss, keeping every audio track
 - Saves the clip next to the original as name_trimmed.ext and never overwrites anything
-- Runs entirely on the PC: no account, no upload, no watermark
+- Free: no login or sign-up, no paid features or pro version, no subscription, no ads, no watermark
+- Runs entirely on the PC: nothing is uploaded and there's no telemetry (the only network request is the update check)
 
 ## What it doesn't do
 
@@ -309,7 +310,7 @@ async function report(page) {
   const others = ['fonts/jetbrains-mono-400.woff2', 'fonts/jetbrains-mono-800.woff2', 'img/screenshot-976.avif']
   const sizes = await Promise.all(others.map(async (file) => (await stat(path.join(DIST, file))).size))
   const visit = pageGz + icon + sizes.reduce((sum, size) => sum + size, 0)
-  console.log(`  index.html   ${kb(page.length)}, ${kb(pageGz)} gzipped (budget ${kb(PAGE_BUDGET)})`)
+  console.log(`  index.html   ${kb(pageGz)} gzipped (budget ${kb(PAGE_BUDGET)}), ${kb(page.length)} raw`)
   console.log(`  first visit  ${kb(visit)}: page, fonts, screenshot, icon (budget ${kb(VISIT_BUDGET)})`)
   const over = []
   if (pageGz > PAGE_BUDGET) over.push(`index.html is ${kb(pageGz)} gzipped, over its ${kb(PAGE_BUDGET)} budget`)

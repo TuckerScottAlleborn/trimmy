@@ -135,14 +135,20 @@ h1 span {
 
 /* Phones held sideways: keep the download button on the first screen. */
 @media (orientation: landscape) and (max-height: 30rem) {
-  .hero { padding-block: 1.5rem; gap: 0.75rem }
+  .hero { padding-block: 1rem; gap: 0.6rem }
   .ghost { width: 64.8px; height: 60px }
-  h1 { font-size: 3.5rem }
+  h1 { font-size: 3rem }
+  h1 span { margin-top: 0.6rem }
 }
 
 .c { color: var(--muted) }
 .c::before { content: "# " / "" }
 .how { text-wrap: balance }
+
+/* The deal, as ticked boxes: [x] free [x] no login ... */
+.deal { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.2rem 1.5rem; color: var(--fg) }
+.deal li { margin: 0; padding: 0; text-indent: 0; white-space: nowrap }
+.deal li::before { content: "[x] " / ""; color: var(--accent) }
 
 .btn {
   display: inline-block;
@@ -214,10 +220,11 @@ footer nav a::after { content: "]" / ""; color: var(--muted) }
 <main>
 <section class="hero" aria-labelledby="name">
 <svg class="ghost" viewBox="-0.4 0 10.8 10" width="108" height="100" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><defs><path id="g" d="M3 0h4v1h2v1h1v8H9V9H8v1H6V9H4v1H2V9H1v1H0V2h1V1h2z"/></defs><use href="#g" x="-0.35" fill="#ff2bd6"/><use href="#g" x="0.35" fill="#00e5ff"/><use href="#g" fill="#53fc18"/><path fill="#fff" d="M2 3h2v1H3v1H2zm4 0h2v1H7v1H6z"/><path fill="#041000" d="M3 4h1v1H3zm4 0h1v1H7z"/></svg>
-<h1 id="name">trimmy <span>a comically simple video trimmer</span></h1>
-<p class="how c">open a clip. drag the start and end. export. that's the whole app.</p>
+<h1 id="name">trimmy <span>a video trimmer. that's it.</span></h1>
+<p class="how c">open a clip. drag the start and end. export.</p>
+<ul class="deal" role="list"><li>free</li> <li>no login</li> <li>no paid features</li> <li>no watermark</li> <li>no ads</li> <li>no upload</li></ul>
 <a class="btn" href="{{winUrl}}">download for windows</a>
-<p class="meta dots"><!--if:version--><span>v{{version}}</span> <span>{{winSize}}</span> <!--/if:version--><span>windows 10 &amp; 11</span> <span>free, open source</span></p>
+<p class="meta dots"><!--if:version--><span>v{{version}}</span> <span>{{winSize}}</span> <!--/if:version--><span>windows 10 &amp; 11</span> <span>open source</span></p>
 <p class="more dots"><!--if:macUrl--><span><a href="{{macUrl}}">macos (untested)</a></span> <!--/if:macUrl--><!--if:msiUrl--><span><a href="{{msiUrl}}">msi</a></span> <!--/if:msiUrl--><span><a href="{{notesUrl}}">release notes</a></span></p>
 </section>
 
@@ -231,20 +238,20 @@ footer nav a::after { content: "]" / ""; color: var(--muted) }
 <section aria-labelledby="does">
 <h2 id="does">what it does</h2>
 <ul role="list">
-<li><b>Opens any common video.</b> MP4, MKV, MOV, WebM, AVI, TS, WMV, FLV and more, in H.264, HEVC, AV1 or VP9.</li>
+<li><b>Opens just about any video.</b> Game clips, phone videos, screen recordings, downloads: MP4, MKV, MOV, WebM, AVI, TS, WMV, FLV and more, in H.264, HEVC, AV1 or VP9.</li>
 <li><b>Four ways in:</b> drag it onto the window, paste its path, browse (Ctrl+O), or right-click it and pick Open with.</li>
 <li><b>Shows the waveform,</b> so you can see where the shot, the kill or the shout is.</li>
 <li><b>Exports in about a second</b> with zero quality loss, because it doesn't re-encode.</li>
 <li><b>Keeps every audio track,</b> so game audio and your mic both come through.</li>
 <li><b>Never touches the original.</b> Your clip is saved next to it as <code>name_trimmed.mp4</code>.</li>
-<li><b>Stays on your PC.</b> No account, no upload, no watermark.</li>
+<li><b>Stays on your PC.</b> Nothing gets uploaded, there's no telemetry, and it works offline.</li>
 </ul>
 </section>
 
 <section aria-labelledby="doesnt">
 <h2 id="doesnt">what it doesn't do</h2>
 <p class="nope"><s>titles</s> <s>transitions</s> <s>filters</s> <s>music</s> <s>stickers</s> <s>multiple clips</s> <s>tracks</s> <s>projects</s> <s>accounts</s> <s>ai</s></p>
-<p><b>It trims. That's it.</b> Made for NVIDIA ShadowPlay, AMD ReLive, OBS and Xbox Game Bar recordings, when all you want is the good ten seconds.</p>
+<p><b>It trims. That's it.</b> Made with game clips in mind (NVIDIA ShadowPlay, AMD ReLive, OBS, Xbox Game Bar), for when all you want is the good ten seconds. It works on just about any other video too: phone videos, screen recordings, downloads.</p>
 </section>
 
 <section aria-labelledby="install">
@@ -261,7 +268,7 @@ footer nav a::after { content: "]" / ""; color: var(--muted) }
 <h2 id="faq">faq</h2>
 <details>
 <summary>Is it really free?</summary>
-<p>Yes. Trimmy is free and open source (MIT license): no ads, no account, no trial, no watermark.</p>
+<p>Yes, all of it. There's no login or sign-up, no paid features or pro version, no subscription, no trial, no ads, and no watermark on your clips. Trimmy is open source under the MIT license.</p>
 </details>
 <details>
 <summary>Does trimming lose quality?</summary>
