@@ -30,10 +30,11 @@ const TITLE = "Trimmy: a free video trimmer for Windows. That's it."
 const DESCRIPTION =
   'Free video trimmer for Windows. No login, no paid features, no watermark. Trims any video, from game clips to phone videos, losslessly in about a second.'
 const OG_TITLE = "Trimmy: a video trimmer. That's it."
+// Leads with the site's checklist: most apps show only the first line or two of this.
 const OG_DESCRIPTION =
-  'Open a video, drag the start and end, export. Free, with no login, no paid features, no ads and no watermark. Made with game clips in mind; works on just about any video.'
+  '[x] free [x] no login [x] no paid features [x] no watermark [x] no ads [x] no upload. Open a video, drag the start and end, export. Lossless, and works on just about any video.'
 const OG_IMAGE_ALT =
-  'Glitch the pixel ghost above the word trimmy, the tagline "a video trimmer. that\'s it.", a green audio waveform between two trim handles, and "free, no login, no paid features, no watermark".'
+  'Glitch the pixel ghost above the word trimmy, the tagline "a video trimmer. that\'s it.", a green audio waveform between two trim handles, and the checklist "[x] free [x] no login [x] no paid features [x] no watermark".'
 
 // index.html, gzipped, has to fit in the first round trip of a new connection (about 14 KB), so
 // the browser can draw the page before anything else arrives.

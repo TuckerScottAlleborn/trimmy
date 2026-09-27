@@ -19,10 +19,11 @@
   .ghost { display: block; width: 129.6px; height: 120px }
   h1 { margin: 16px 0 0; font-size: 132px; font-weight: 800; line-height: 1; letter-spacing: -0.03em; color: #53fc18; text-shadow: 0 0 44px rgb(83 252 24 / 0.35) }
   p { margin: 20px 0 0; font-size: 42px; line-height: 1.2 }
-  p span, .deal i { color: #74847a }
+  p span { color: #74847a }
   .timeline { display: block; margin-top: 32px; overflow: visible }
-  .deal { margin-top: 26px; font-size: 30px; color: #a9b8ae }
-  .deal i { font-style: normal }
+  /* The site's checklist. Only the four that matter most: all six don't fit legibly on one line. */
+  .deal { display: flex; gap: 28px; margin-top: 26px; font-size: 28px; line-height: 1.2 }
+  .deal span::before { content: "[x] "; color: #53fc18 }
 </style>
 </head>
 <body>
@@ -32,7 +33,7 @@
 <h1>trimmy</h1>
 <p><span>#</span> a video trimmer. that's it.</p>
 <svg class="timeline" id="timeline" width="840" height="64" viewBox="0 0 840 64"></svg>
-<p class="deal">free <i>·</i> no login <i>·</i> no paid features <i>·</i> no watermark</p>
+<div class="deal"><span>free</span><span>no login</span><span>no paid features</span><span>no watermark</span></div>
 <script>
   // A waveform like the app's timeline, with the clip between two handles. Seeded, so every
   // render comes out the same.
