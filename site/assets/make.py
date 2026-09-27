@@ -53,7 +53,8 @@ def fonts(node_modules: Path) -> None:
     out = PUBLIC / "fonts"
     out.mkdir(parents=True, exist_ok=True)
     for weight in WEIGHTS:
-        font = TTFont(src / f"jetbrains-mono-latin-{weight}-normal.woff2")
+        # Keep the source's timestamp, so rerunning this doesn't churn the committed files.
+        font = TTFont(src / f"jetbrains-mono-latin-{weight}-normal.woff2", recalcTimestamp=False)
         options = Options()
         options.layout_features = []  # no ligatures: "->" stays two characters
         subsetter = Subsetter(options)

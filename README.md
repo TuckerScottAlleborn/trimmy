@@ -5,12 +5,15 @@
 <h1 align="center">Trimmy</h1>
 
 <p align="center">
-  <b>A comically simple video trimmer.</b><br>
-  Open a clip. Drag the start and end. Export. That's the whole app.
+  <b>A video trimmer. That's it.</b><br>
+  Open a clip. Drag the start and end. Export.<br>
+  Free: no login, no paid features, no ads, no watermark.
 </p>
 
 <p align="center">
   <a href="https://github.com/TuckerScottAlleborn/trimmy/releases/latest"><b>⬇ Download for Windows</b></a>
+  ·
+  <a href="https://trimmy.lol">trimmy.lol</a>
   ·
   <a href="#macos-untested">macOS (untested)</a>
   ·
@@ -31,6 +34,9 @@ minutes of gameplay at the press of a key. Most of the time you only want a few 
 Opening Clipchamp, Premiere or DaVinci Resolve for that means a timeline, tracks, a project,
 and an export dialog with forty settings. Trimmy is the opposite: one video, two handles, one
 button. No project files, no timeline, no account, no watermark, no upload.
+
+Game clips are what it was built for, but it trims just about any video the same way: phone
+videos, screen recordings, downloads, anything FFmpeg can read.
 
 ## Features
 

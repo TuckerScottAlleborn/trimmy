@@ -16,11 +16,13 @@
   body { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: JBM, monospace; color: #e9f5ea }
   .frame { position: absolute; inset: 24px; border: 2px dashed #243029 }
   .url { position: absolute; top: 44px; left: 52px; font-size: 24px; color: #74847a }
-  .ghost { display: block; width: 162px; height: 150px }
-  h1 { margin: 18px 0 0; font-size: 148px; font-weight: 800; line-height: 1; letter-spacing: -0.03em; color: #53fc18; text-shadow: 0 0 44px rgb(83 252 24 / 0.35) }
-  p { margin: 22px 0 0; font-size: 42px; line-height: 1.2 }
-  p span { color: #74847a }
-  .timeline { display: block; margin-top: 40px; overflow: visible }
+  .ghost { display: block; width: 129.6px; height: 120px }
+  h1 { margin: 16px 0 0; font-size: 132px; font-weight: 800; line-height: 1; letter-spacing: -0.03em; color: #53fc18; text-shadow: 0 0 44px rgb(83 252 24 / 0.35) }
+  p { margin: 20px 0 0; font-size: 42px; line-height: 1.2 }
+  p span, .deal i { color: #74847a }
+  .timeline { display: block; margin-top: 32px; overflow: visible }
+  .deal { margin-top: 26px; font-size: 30px; color: #a9b8ae }
+  .deal i { font-style: normal }
 </style>
 </head>
 <body>
@@ -28,12 +30,13 @@
 <div class="url">trimmy.lol</div>
 <svg class="ghost" viewBox="-0.4 0 10.8 10" shape-rendering="crispEdges"><defs><path id="g" d="M3 0h4v1h2v1h1v8H9V9H8v1H6V9H4v1H2V9H1v1H0V2h1V1h2z"/></defs><use href="#g" x="-0.35" fill="#ff2bd6"/><use href="#g" x="0.35" fill="#00e5ff"/><use href="#g" fill="#53fc18"/><path fill="#fff" d="M2 3h2v1H3v1H2zm4 0h2v1H7v1H6z"/><path fill="#041000" d="M3 4h1v1H3zm4 0h1v1H7z"/></svg>
 <h1>trimmy</h1>
-<p><span>#</span> a comically simple video trimmer</p>
-<svg class="timeline" id="timeline" width="840" height="72" viewBox="0 0 840 72"></svg>
+<p><span>#</span> a video trimmer. that's it.</p>
+<svg class="timeline" id="timeline" width="840" height="64" viewBox="0 0 840 64"></svg>
+<p class="deal">free <i>·</i> no login <i>·</i> no paid features <i>·</i> no watermark</p>
 <script>
   // A waveform like the app's timeline, with the clip between two handles. Seeded, so every
   // render comes out the same.
-  const W = 840, H = 72, BARS = 120, STEP = W / BARS, IN = 0.24 * W, OUT = 0.74 * W
+  const W = 840, H = 64, BARS = 120, STEP = W / BARS, IN = 0.24 * W, OUT = 0.74 * W
   let seed = 11
   const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647
   let svg = `<rect x="${IN}" width="${OUT - IN}" height="${H}" fill="rgb(83 252 24 / 0.14)"/>`
