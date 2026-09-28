@@ -61,6 +61,13 @@ pub async fn scan(app: &tauri::AppHandle, path: &str) -> Result<Scan, String> {
         }
         return Ok(scan);
     }
+    // Wait for anything else reading the whole file (the waveform, another scan), then check the
+    // cache again: an editor and an export asking at once would otherwise both scan.
+    let reader = app.state::<Jobs>().reader(path);
+    let _reading = reader.lock().await;
+    if let Some(scan) = cache.as_ref().and_then(Cache::read) {
+        return Ok(scan);
+    }
     let scan = scan_packets(app, path).await?;
     if let (Some(cache), true) = (&cache, scan.end > 0.0) {
         cache.write(&scan);
@@ -71,6 +78,8 @@ pub async fn scan(app: &tauri::AppHandle, path: &str) -> Result<Scan, String> {
 /// How long the video really is, measured from its packets (0 if they can't be read). For files
 /// whose container doesn't say.
 pub async fn measure(app: &tauri::AppHandle, path: &str) -> f64 {
+    let reader = app.state::<Jobs>().reader(path);
+    let _reading = reader.lock().await;
     scan_packets(app, path).await.map_or(0.0, |scan| scan.end)
 }
 
@@ -122,10 +131,9 @@ async fn start_time(app: &tauri::AppHandle, path: &str) -> Option<f64> {
 }
 
 /// Reads every video packet's timestamp and flags (no decoding, so it's about as fast as the disk).
-/// Waits while the waveform is reading the whole file, so the two don't make a hard drive thrash.
+/// Callers hold the file's reader lock (`Jobs::reader`), so this never runs alongside the waveform
+/// and two readers don't make a hard drive thrash.
 async fn scan_packets(app: &tauri::AppHandle, path: &str) -> Result<Scan, String> {
-    let reader = app.state::<Jobs>().reader(path);
-    let _reading = reader.lock().await;
     let command = app
         .shell()
         .sidecar("ffprobe")

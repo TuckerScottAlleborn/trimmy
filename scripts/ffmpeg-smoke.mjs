@@ -43,6 +43,9 @@ const CLIPS = [
   { name: 'h264-aac.m4v', args: [...VIDEO, ...TONE, ...H264, '-c:a', 'aac'] },
   { name: 'h264-aac.mkv', args: [...VIDEO, ...TONE, ...H264, '-c:a', 'aac'] },
   { name: 'h264-ac3.mkv', args: [...VIDEO, ...TONE, ...H264, '-c:a', 'ac3'] },
+  // Blu-ray remuxes often lead with Dolby TrueHD (FFmpeg's encoder is experimental, hence -strict).
+  { name: 'h264-truehd.mkv', args: [...VIDEO, ...TONE, ...H264, '-c:a', 'truehd', '-strict', '-2', '-ar', '48000'] },
+  { name: 'mjpeg-adpcm.avi', args: [...VIDEO, ...TONE, '-c:v', 'mjpeg', '-q:v', '5', '-c:a', 'adpcm_ima_wav'] },
   { name: 'h264-aac.ts', args: [...VIDEO, ...TONE, ...H264, '-c:a', 'aac'] },
   { name: 'h264-aac.m2ts', args: [...VIDEO, ...TONE, ...H264, '-c:a', 'aac'] },
   { name: 'h264-aac.flv', args: [...VIDEO, ...TONE, ...H264, '-c:a', 'aac'] },

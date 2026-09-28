@@ -40,12 +40,15 @@
   let peaks = $state<number[]>([])
   /** Raw peaks received so far, before scaling to the loudest. */
   const partial: number[] = []
+  /** Set once the finished waveform is in, so a batch that arrives late can't redraw it. */
+  let waveformDone = false
   /** Where a lossless clip can start; empty until ffprobe has listed them (or if any start works). */
   let keyframes = $state<number[]>([])
 
   // Draw the waveform in as it's computed, scaled to the loudest part heard so far, so a long
   // recording shows its start right away instead of an empty timeline.
   function addPeaks(batch: number[]) {
+    if (waveformDone) return
     partial.push(...batch)
     const loudest = Math.max(...partial) || 1
     peaks = Array.from({ length: Math.max(WAVEFORM_BARS, partial.length) }, (_, i) =>
@@ -55,8 +58,8 @@
 
   // svelte-ignore state_referenced_locally
   loadWaveform(video, addPeaks).then(
-    (p) => (peaks = p),
-    () => (peaks = []),
+    (p) => ((waveformDone = true), (peaks = p)),
+    () => ((waveformDone = true), (peaks = [])),
   )
   // Closing the file, or opening another, stops FFmpeg reading this one. On a big file on a slow
   // drive that can otherwise go on for a long time after it's gone from the screen.

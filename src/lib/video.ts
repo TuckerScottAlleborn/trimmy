@@ -40,7 +40,10 @@ export function loadWaveform(video: VideoInfo, onPeaks: (batch: number[]) => voi
   })
 }
 
-/** Keyframe times in seconds (sorted), or [] when any start works. Reads the whole file, so it's async. */
+/**
+ * Keyframe times in seconds (sorted), or [] when any start works. Usually read from the file's
+ * index, which is instant; files without one (MPEG-TS, AVI, an interrupted recording) are scanned.
+ */
 export const loadKeyframes = (video: VideoInfo) => invoke<number[]>('keyframes', { path: video.path })
 
 /**

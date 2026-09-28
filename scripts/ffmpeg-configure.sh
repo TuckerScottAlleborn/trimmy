@@ -32,12 +32,15 @@ demuxers+=,aac,ac3,eac3,mp3,dts,truehd,h264,hevc,mpegvideo,m4v,vc1
 muxers=mov,mp4,ipod,tgp,matroska,webm,mpegts,avi,flv,asf,mpeg1system,mpeg2vob,ogg,null
 
 # Parsers let stream copy find keyframes and read sizes and frame rates without decoding video.
-parsers=h264,hevc,av1,vp8,vp9,mpeg4video,mpegvideo,h263,vc1,mjpeg,aac,aac_latm,ac3,mpegaudio,opus,vorbis,flac,amr,dca
+parsers=h264,hevc,av1,vp8,vp9,mpeg4video,mpegvideo,h263,vc1,mjpeg,aac,aac_latm,ac3,mpegaudio,opus,vorbis,flac,amr,dca,mlp
 
-# Only the waveform decodes anything: audio, never video.
-decoders=aac,aac_latm,mp3,mp3float,mp2,mp2float,mp1,mp1float,opus,vorbis,ac3,eac3,dca,flac,alac
-decoders+=,amrnb,amrwb,wmav1,wmav2,wmapro,pcm_s16le,pcm_s16be,pcm_s24le,pcm_s24be,pcm_s32le
-decoders+=,pcm_f32le,pcm_u8,pcm_alaw,pcm_mulaw,pcm_dvd,pcm_bluray
+# Only the waveform decodes anything: audio, never video. The first audio track of anything
+# Trimmy opens: game and phone recordings (AAC, Opus), Blu-ray remuxes (AC-3, E-AC-3, DTS,
+# TrueHD/MLP, LPCM), old camera and web video (MP3, ADPCM, Nellymoser, DV audio, WMA, AMR).
+decoders=aac,aac_latm,mp3,mp3float,mp2,mp2float,mp1,mp1float,opus,vorbis,ac3,eac3,dca,truehd,mlp
+decoders+=,flac,alac,amrnb,amrwb,wmav1,wmav2,wmapro,adpcm_ima_wav,adpcm_ms,adpcm_ima_qt,nellymoser
+decoders+=,dvaudio,pcm_s16le,pcm_s16be,pcm_s24le,pcm_s24be,pcm_s32le,pcm_f32le,pcm_u8,pcm_alaw
+decoders+=,pcm_mulaw,pcm_dvd,pcm_bluray
 
 "$src/configure" \
   --disable-everything \
