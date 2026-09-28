@@ -3,6 +3,7 @@
 
 mod cache;
 mod export;
+mod jobs;
 mod keyframes;
 mod probe;
 mod waveform;
@@ -132,6 +133,12 @@ async fn keyframes(
     Ok(keyframes::scan(&app, &path).await?.keyframes)
 }
 
+/// The user closed `path` (or opened another file): stop reading it in the background.
+#[tauri::command]
+fn close_video(jobs: tauri::State<jobs::Jobs>, path: String) {
+    jobs.stop_file(&path);
+}
+
 /// A file macOS asked Trimmy to open (Finder's "Open With") that the UI hasn't picked up yet.
 #[derive(Default)]
 struct PendingOpen(Mutex<Option<String>>);
@@ -184,6 +191,7 @@ fn main() {
     tauri::Builder::default()
         .manage(PendingOpen::default())
         .manage(OpenedFiles::default())
+        .manage(jobs::Jobs::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
@@ -199,12 +207,17 @@ fn main() {
             export_clip,
             waveform,
             keyframes,
+            close_video,
             launch_path,
             ui_ready
         ])
         .build(tauri::generate_context!())
         .expect("error while starting Trimmy")
         .run(|_app, _event| {
+            // Don't leave FFmpeg running after Trimmy is gone.
+            if let tauri::RunEvent::Exit = _event {
+                _app.state::<jobs::Jobs>().stop_all();
+            }
             // Windows passes "Open with" files as a command-line argument; macOS sends an event
             // instead, possibly before the UI is ready, so keep it for launch_path too.
             #[cfg(target_os = "macos")]

@@ -17,7 +17,7 @@ env:
   FFMPEG_VERSION: '9.0.2'
   FFMPEG_SHA256: 8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e
   # Bump for every new build of the same FFmpeg version (new flags, new toolchain).
-  BUILD: trimmy.1
+  BUILD: trimmy.2
 
 jobs:
   windows:

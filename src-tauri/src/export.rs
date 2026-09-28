@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use tauri::Emitter;
 use tauri_plugin_shell::{process::CommandEvent, ShellExt};
 
+use crate::jobs::{self, Kind};
 use crate::keyframes::{self, Scan};
 
 /// Copies `start..end` (seconds) of `input` to a new file next to it and returns that file's path.
@@ -69,7 +70,7 @@ async fn run_ffmpeg(
     length: f64,
     output: &str,
 ) -> Result<(), String> {
-    let (mut events, _child) = app
+    let command = app
         .shell()
         .sidecar("ffmpeg")
         .map_err(|e| e.to_string())?
@@ -94,9 +95,11 @@ async fn run_ffmpeg(
         // First video track (V skips cover art) plus every audio track (game + mic stay separate).
         .args(["-map", "0:V:0", "-map", "0:a?", "-c", "copy"])
         .args(["-avoid_negative_ts", "make_zero", "-map_metadata", "0"])
-        .arg(output)
-        .spawn()
-        .map_err(|e| e.to_string())?;
+        .arg(output);
+    let kind = Kind::Export {
+        output: output.into(),
+    };
+    let (mut events, _job) = jobs::spawn(app, input, kind, command)?;
 
     let mut errors = String::new();
     while let Some(event) = events.recv().await {

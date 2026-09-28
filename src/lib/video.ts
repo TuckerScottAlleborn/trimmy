@@ -70,6 +70,9 @@ export function keyframeAfter(keyframes: number[], t: number): number | null {
   return keyframes.find((k) => k > t + 1e-6) ?? null
 }
 
+/** Stops the background reading (waveform, keyframes) of a file the user has closed. */
+export const closeVideo = (path: string) => invoke('close_video', { path })
+
 /** The file Trimmy was started with ("Open with"), if any. */
 export const launchPath = () => invoke<string | null>('launch_path')
 

@@ -15,6 +15,7 @@
 #   probe      ffprobe -show_format -show_streams (JSON), and -show_entries packet=... (compact)
 #   export     ffmpeg -ss -i -t -map 0:V:0 -map 0:a? -c copy (stream copy: demux, parse, mux)
 #   waveform   ffmpeg -map 0:a:0 -af aformat,aresample,asetnsamples,astats,ametadata -f null -
+#              and, for big files, many -ss/-t inputs joined with apad, atrim and concat
 set -euo pipefail
 
 src=${1:?usage: ffmpeg-configure.sh <ffmpeg source dir> [platform flags...]}
@@ -60,5 +61,5 @@ decoders+=,pcm_f32le,pcm_u8,pcm_alaw,pcm_mulaw,pcm_dvd,pcm_bluray
   --enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,aac_adtstoasc,vp9_superframe,extract_extradata,null \
   --enable-decoder="$decoders" \
   --enable-encoder=pcm_s16le \
-  --enable-filter=aformat,aresample,asetnsamples,astats,ametadata,anull,abuffer,abuffersink \
+  --enable-filter=aformat,aresample,asetnsamples,astats,ametadata,apad,atrim,concat,anull,abuffer,abuffersink \
   "$@"

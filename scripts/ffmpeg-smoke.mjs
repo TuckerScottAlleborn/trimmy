@@ -146,6 +146,23 @@ for (const clip of CLIPS) {
     } else if (wave.status !== 0 || peaks < 30) {
       problems.push(`waveform: ${peaks} peaks, ${wave.stderr.trim().split('\n').pop() || 'exit ' + wave.status}`)
     }
+
+    // 5. Sampled waveform, as waveform.rs does for big files: three -ss/-t inputs, each padded or
+    // cut to exactly 0.25 s, joined, one peak per input.
+    if (!clip.noAudio) {
+      const starts = [0.2, 1.6, 3.9]
+      const inputs = starts.flatMap((t) => ['-ss', String(t), '-t', '0.25', '-i', file])
+      const graph =
+        starts.map((_, i) => `[${i}:a:0]aformat=channel_layouts=mono,aresample=8000,apad=whole_len=2000,atrim=end_sample=2000[s${i}];`).join('') +
+        starts.map((_, i) => `[s${i}]`).join('') +
+        `concat=n=${starts.length}:v=0:a=1,asetnsamples=n=2000:p=0,` +
+        WAVEFORM.slice(WAVEFORM.indexOf('astats'))
+      const sampled = run(opt.ffmpeg, ['-hide_banner', '-nostdin', '-loglevel', 'error', ...inputs, '-filter_complex', graph, '-f', 'null', '-'])
+      const got = (sampled.stdout.match(/Peak_level=/g) ?? []).length
+      if (sampled.status !== 0 || got !== starts.length) {
+        problems.push(`sampled waveform: ${got} of ${starts.length} peaks, ${sampled.stderr.trim().split('\n').pop() || 'exit ' + sampled.status}`)
+      }
+    }
   } catch (e) {
     problems.push(String(e.message ?? e))
   }

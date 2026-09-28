@@ -2,9 +2,11 @@
   import { convertFileSrc } from '@tauri-apps/api/core'
   import { listen } from '@tauri-apps/api/event'
   import { revealItemInDir } from '@tauri-apps/plugin-opener'
+  import { onDestroy } from 'svelte'
   import Timeline from './Timeline.svelte'
   import UpdateStatus from './UpdateStatus.svelte'
   import {
+    closeVideo,
     describe,
     exportClip,
     formatTime,
@@ -56,6 +58,10 @@
     (p) => (peaks = p),
     () => (peaks = []),
   )
+  // Closing the file, or opening another, stops FFmpeg reading this one. On a big file on a slow
+  // drive that can otherwise go on for a long time after it's gone from the screen.
+  onDestroy(() => void closeVideo(video.path))
+
   // svelte-ignore state_referenced_locally
   loadKeyframes(video).then(
     (k) => {

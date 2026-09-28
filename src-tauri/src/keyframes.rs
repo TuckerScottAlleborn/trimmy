@@ -5,9 +5,10 @@
 //! duration written (an interrupted OBS recording, for example).
 
 use serde::{Deserialize, Serialize};
-use tauri_plugin_shell::ShellExt;
+use tauri_plugin_shell::{process::CommandEvent, ShellExt};
 
 use crate::cache::Cache;
+use crate::jobs::{self, Kind};
 
 /// Bump when `Scan` or how it's computed changes, so old cache entries are ignored.
 const CACHE_VERSION: u32 = 2;
@@ -49,7 +50,7 @@ pub async fn scan(app: &tauri::AppHandle, path: &str) -> Result<Scan, String> {
     if let Some(scan) = cache.as_ref().and_then(Cache::read) {
         return Ok(scan);
     }
-    let output = app
+    let command = app
         .shell()
         .sidecar("ffprobe")
         .map_err(|e| e.to_string())?
@@ -61,14 +62,28 @@ pub async fn scan(app: &tauri::AppHandle, path: &str) -> Result<Scan, String> {
             "-of",
             "compact",
         ])
-        .arg(path)
-        .output()
-        .await
-        .map_err(|e| e.to_string())?;
-    if !output.status.success() {
+        .arg(path);
+    // Stopped (and so failing here) if the user closes the file first.
+    let (mut events, _job) = jobs::spawn(app, path, Kind::Background, command)?;
+    let mut text = String::new();
+    let mut ok = false;
+    while let Some(event) = events.recv().await {
+        match event {
+            CommandEvent::Stdout(line) => {
+                text.push_str(&String::from_utf8_lossy(&line));
+                text.push('\n');
+            }
+            CommandEvent::Terminated(status) => {
+                ok = status.code == Some(0);
+                break;
+            }
+            _ => {}
+        }
+    }
+    if !ok {
         return Err("Couldn't read the video's keyframes.".into());
     }
-    let scan = parse(&String::from_utf8_lossy(&output.stdout));
+    let scan = parse(&text);
     if let (Some(cache), true) = (&cache, scan.end > 0.0) {
         cache.write(&scan);
     }
