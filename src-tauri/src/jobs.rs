@@ -3,7 +3,7 @@
 //! Without this, closing a long video left FFmpeg reading it for as long as it took, even after
 //! Trimmy itself was gone.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
@@ -32,6 +32,10 @@ struct Running {
 pub struct Jobs {
     next_id: AtomicU64,
     running: Mutex<HashMap<u64, Running>>,
+    /// Files the user closed. Background work on them is refused until they're opened again, so
+    /// work that was still to start (the next batch of a sampled waveform, the keyframe lookup
+    /// that waits for the waveform) doesn't start after all.
+    closed: Mutex<HashSet<String>>,
 }
 
 /// A started run. Dropping it (when the run ends, however it ends) forgets it.
@@ -48,15 +52,23 @@ impl Drop for Job {
     }
 }
 
-/// Starts `command` for `path` and remembers it until the returned `Job` is dropped.
+/// Why background work didn't start: the user closed the file.
+pub const CLOSED: &str = "That file was closed.";
+
+/// Starts `command` for `path` and remembers it until the returned `Job` is dropped. Background
+/// work on a closed file is refused with `CLOSED`.
 pub fn spawn(
     app: &tauri::AppHandle,
     path: &str,
     kind: Kind,
     command: Command,
 ) -> Result<(Receiver<CommandEvent>, Job), String> {
-    let (events, child) = command.spawn().map_err(|e| e.to_string())?;
     let jobs = app.state::<Jobs>();
+    let background = kind == Kind::Background;
+    if background && jobs.is_closed(path) {
+        return Err(CLOSED.into());
+    }
+    let (events, child) = command.spawn().map_err(|e| e.to_string())?;
     let id = jobs.next_id.fetch_add(1, Ordering::Relaxed);
     if let Ok(mut running) = jobs.running.lock() {
         running.insert(
@@ -68,18 +80,39 @@ pub fn spawn(
             },
         );
     }
-    Ok((
-        events,
-        Job {
-            app: app.clone(),
-            id,
-        },
-    ))
+    let job = Job {
+        app: app.clone(),
+        id,
+    };
+    // The file may have been closed while this was starting; then stop it straight away.
+    if background && jobs.is_closed(path) {
+        jobs.stop_file(path);
+    }
+    Ok((events, job))
 }
 
 impl Jobs {
-    /// Stops the background work (waveform, keyframes) for `path`; exports carry on.
-    pub fn stop_file(&self, path: &str) {
+    /// The user closed `path`: stops its background work (waveform, keyframes) and refuses more
+    /// until it's opened again. Exports carry on.
+    pub fn close_file(&self, path: &str) {
+        if let Ok(mut closed) = self.closed.lock() {
+            closed.insert(path.to_owned());
+        }
+        self.stop_file(path);
+    }
+
+    /// `path` was opened (again): background work on it is allowed.
+    pub fn open_file(&self, path: &str) {
+        if let Ok(mut closed) = self.closed.lock() {
+            closed.remove(path);
+        }
+    }
+
+    pub fn is_closed(&self, path: &str) -> bool {
+        self.closed.lock().is_ok_and(|closed| closed.contains(path))
+    }
+
+    fn stop_file(&self, path: &str) {
         self.stop(|job| job.path == path && job.kind == Kind::Background);
     }
 

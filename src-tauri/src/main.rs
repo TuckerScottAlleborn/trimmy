@@ -38,8 +38,11 @@ impl OpenedFiles {
 async fn open_video(
     app: tauri::AppHandle,
     opened: tauri::State<'_, OpenedFiles>,
+    jobs: tauri::State<'_, jobs::Jobs>,
     path: String,
 ) -> Result<VideoInfo, String> {
+    // Reopening a file that was closed earlier lets its background work run again.
+    jobs.open_file(&path);
     let file = Path::new(&path);
     if !file.is_absolute() {
         let example = if cfg!(windows) {
@@ -135,7 +138,7 @@ async fn keyframes(
 /// The user closed `path` (or opened another file): stop reading it in the background.
 #[tauri::command]
 fn close_video(jobs: tauri::State<jobs::Jobs>, path: String) {
-    jobs.stop_file(&path);
+    jobs.close_file(&path);
 }
 
 /// A file macOS asked Trimmy to open (Finder's "Open With") that the UI hasn't picked up yet.

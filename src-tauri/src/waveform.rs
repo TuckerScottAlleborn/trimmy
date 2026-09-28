@@ -14,13 +14,14 @@
 use std::time::{Duration, Instant};
 
 use tauri::ipc::Channel;
+use tauri::Manager;
 use tauri_plugin_shell::{
     process::{Command, CommandEvent},
     ShellExt,
 };
 
 use crate::cache::Cache;
-use crate::jobs::{self, Kind};
+use crate::jobs::{self, Jobs, Kind};
 
 const SAMPLE_RATE: f64 = 8000.0;
 const KEY: &str = "lavfi.astats.Overall.Peak_level=";
@@ -137,6 +138,10 @@ async fn sample(
             .args(["-map", "[peaks]", "-f", "null", "-"]);
         let before = peaks.len();
         let ok = run(app, path, command, &mut peaks, progress).await;
+        // Closed mid-way: stop here, and return nothing so a partial waveform isn't cached.
+        if app.state::<Jobs>().is_closed(path) {
+            return Vec::new();
+        }
         if !ok || peaks.len() != before + points.len() {
             // The first run failing means no audio (or the file was closed): no waveform. A later
             // one failing leaves a gap rather than throwing away what's already drawn.

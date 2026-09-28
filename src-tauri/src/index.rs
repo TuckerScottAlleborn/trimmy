@@ -16,6 +16,9 @@ use std::io::{Read, Seek, SeekFrom};
 
 /// The most index data read into memory. A two-hour MP4's tables are a few MB.
 const MAX_INDEX_BYTES: u64 = 256 << 20;
+/// The most video frames an MP4 index is trusted to describe: a day at 120 fps. A damaged table
+/// claiming more is left to the packet scan rather than filling memory.
+const MAX_SAMPLES: usize = 24 * 3600 * 120;
 
 /// What an index says about the video track's keyframes.
 #[derive(Debug, PartialEq)]
@@ -158,6 +161,9 @@ fn video_track(trak: &[u8], movie_timescale: u32) -> Option<Keyframes> {
     for entry in 0..u32_at(stts, 4)? as usize {
         let count = u32_at(stts, 8 + entry * 8)?;
         let delta = u32_at(stts, 12 + entry * 8)?;
+        if dts.len() + count as usize > MAX_SAMPLES {
+            return None;
+        }
         for _ in 0..count {
             dts.push(t);
             t += i64::from(delta);
@@ -181,8 +187,9 @@ fn video_track(trak: &[u8], movie_timescale: u32) -> Option<Keyframes> {
         }
     }
 
-    // The edit list shifts the track: an empty edit delays it, the first real edit says which
-    // media time is shown first.
+    // The edit list shifts the track: leading empty edits delay it, and the one real edit says
+    // which media time is shown first. More than one real edit (a file re-cut in place) plays
+    // pieces out of order, which only the packet scan gets right.
     let (mut delay, mut media_start) = (0i64, 0i64);
     if let Some(elst) = child(trak, b"edts").and_then(|edts| child(edts, b"elst")) {
         let version = *elst.first()?;
@@ -199,16 +206,17 @@ fn video_track(trak: &[u8], movie_timescale: u32) -> Option<Keyframes> {
                 )
             };
             if media_time == -1 {
+                if edits > 0 {
+                    return None; // a gap after the start: a re-cut file
+                }
                 // Empty edit, in movie timescale units: a delay before the track starts.
                 delay += duration * i64::from(timescale) / i64::from(movie_timescale);
             } else {
                 media_start = media_time;
                 edits += 1;
-                break;
             }
         }
-        // Only empty edits is odd enough to leave to the packet scan.
-        if edits == 0 && count > 0 {
+        if edits != 1 && count > 0 {
             return None;
         }
     }
@@ -444,7 +452,10 @@ mod tests {
     #[test]
     #[ignore]
     fn index_matches_the_packet_scan() {
-        let (Ok(dir), Ok(ffprobe)) = (std::env::var("TRIMMY_TEST_CLIPS"), std::env::var("TRIMMY_FFPROBE")) else {
+        let (Ok(dir), Ok(ffprobe)) = (
+            std::env::var("TRIMMY_TEST_CLIPS"),
+            std::env::var("TRIMMY_FFPROBE"),
+        ) else {
             panic!("set TRIMMY_TEST_CLIPS and TRIMMY_FFPROBE");
         };
         let mut checked = 0;
@@ -455,7 +466,16 @@ mod tests {
                 continue;
             };
             let output = std::process::Command::new(&ffprobe)
-                .args(["-v", "error", "-select_streams", "V:0", "-show_entries", "packet=pts_time,flags", "-of", "csv=p=0"])
+                .args([
+                    "-v",
+                    "error",
+                    "-select_streams",
+                    "V:0",
+                    "-show_entries",
+                    "packet=pts_time,flags",
+                    "-of",
+                    "csv=p=0",
+                ])
                 .arg(&path)
                 .output()
                 .unwrap();
@@ -469,14 +489,25 @@ mod tests {
                 .collect();
             scanned.sort_by(f64::total_cmp);
             match found {
-                Keyframes::All => assert_eq!(scanned.len(), all, "{path}: index says every frame is a keyframe"),
+                Keyframes::All => assert_eq!(
+                    scanned.len(),
+                    all,
+                    "{path}: index says every frame is a keyframe"
+                ),
                 Keyframes::At(times) => {
                     assert!(!times.is_empty(), "{path}");
                     // Every indexed keyframe is a real one (an index may list fewer than all).
                     for t in &times {
-                        assert!(scanned.iter().any(|k| (k - t).abs() < 0.0015), "{path}: {t} is not a keyframe; scan found {scanned:?}");
+                        assert!(
+                            scanned.iter().any(|k| (k - t).abs() < 0.0015),
+                            "{path}: {t} is not a keyframe; scan found {scanned:?}"
+                        );
                     }
-                    println!("{path}: {} of {} keyframes indexed", times.len(), scanned.len());
+                    println!(
+                        "{path}: {} of {} keyframes indexed",
+                        times.len(),
+                        scanned.len()
+                    );
                 }
             }
             checked += 1;
