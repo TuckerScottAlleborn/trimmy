@@ -3,7 +3,16 @@
   import { listen } from '@tauri-apps/api/event'
   import { revealItemInDir } from '@tauri-apps/plugin-opener'
   import Timeline from './Timeline.svelte'
-  import { describe, exportClip, formatTime, loadWaveform, type VideoInfo } from './video'
+  import UpdateStatus from './UpdateStatus.svelte'
+  import {
+    describe,
+    exportClip,
+    formatTime,
+    keyframeAtOrBefore,
+    loadKeyframes,
+    loadWaveform,
+    type VideoInfo,
+  } from './video'
 
   let { video, onclose }: { video: VideoInfo; onclose: () => void } = $props()
 
@@ -23,9 +32,19 @@
   let exportError = $state('')
   /** Audio peaks for the timeline; empty until FFmpeg has read them (or if there's no audio). */
   let peaks = $state<number[]>([])
+  /** Where a lossless clip can start; empty until ffprobe has listed them (or if any start works). */
+  let keyframes = $state<number[]>([])
 
   // svelte-ignore state_referenced_locally
   loadWaveform(video).then((p) => (peaks = p), () => {})
+  // svelte-ignore state_referenced_locally
+  loadKeyframes(video).then(
+    (k) => {
+      keyframes = k
+      start = keyframeAtOrBefore(k, start)
+    },
+    () => {},
+  )
 
   function seek(t: number) {
     time = Math.max(0, Math.min(video.duration, t))
@@ -94,7 +113,7 @@
     if (event.target instanceof HTMLInputElement || event.ctrlKey || event.metaKey || event.altKey) return
     const key = event.key.toLowerCase()
     if (key === ' ') togglePlay()
-    else if (key === 'i') start = Math.min(time, end - 0.1)
+    else if (key === 'i') start = keyframeAtOrBefore(keyframes, Math.min(time, end - 0.1))
     else if (key === 'o') end = Math.max(time, start + 0.1)
     else if (key === 'x') {
       // Clear: back to the whole video.
@@ -116,7 +135,10 @@
     <h2 title={video.path}>{video.name}</h2>
     <p># {describe(video)}</p>
   </div>
-  <button onclick={onclose} aria-label="Close video">close</button>
+  <div class="actions">
+    <UpdateStatus compact />
+    <button onclick={onclose} aria-label="Close video">close</button>
+  </div>
 </header>
 
 <!-- svelte-ignore a11y_media_has_caption -->
@@ -131,7 +153,7 @@
   <p class="error">! can't preview this file yet, but you can still trim and export it</p>
 {/if}
 
-<Timeline duration={video.duration} {time} {peaks} step={frame} bind:start bind:end onseek={scrub} />
+<Timeline duration={video.duration} {time} {peaks} {keyframes} step={frame} bind:start bind:end onseek={scrub} />
 
 <div class="controls">
   <button class="play" onclick={togglePlay}>{paused ? 'play' : 'stop'}</button>
@@ -144,7 +166,7 @@
     class="primary"
     onclick={save}
     disabled={progress !== null}
-    title="Lossless and fast. The clip starts at the nearest keyframe at or before the start handle."
+    title="Lossless and fast: nothing is re-encoded. That's why the start snaps to keyframes."
   >
     {progress === null ? 'export' : `exporting ${Math.round(progress * 100)}%`}
   </button>
@@ -174,6 +196,12 @@
     font-weight: 700;
     color: var(--accent);
     overflow-wrap: anywhere;
+  }
+
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
   }
 
   header p {

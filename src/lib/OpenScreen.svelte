@@ -1,42 +1,25 @@
 <script lang="ts">
-  import { installUpdate, type Update } from './update'
+  import UpdateStatus from './UpdateStatus.svelte'
   import { isMac } from './video'
 
   let {
     onopen,
     onbrowse,
     version,
-    update,
   }: {
     onopen: (path: string) => void
     onbrowse: () => void
     /** This build's version, shown faintly in the corner. */
     version: string
-    /** A newer release, if GitHub has one. Only offered; installed when the user clicks. */
-    update: Update | null
   } = $props()
 
   let typed = $state('')
-  /** What the update line says once the user has clicked [update]. */
-  let updating = $state('')
 
   function submit(event: SubmitEvent) {
     event.preventDefault()
     // Explorer's "Copy as path" wraps the path in double quotes; macOS Terminal uses single quotes.
     const path = typed.trim().replace(/^(["'])(.*)\1$/, '$2')
     if (path) onopen(path)
-  }
-
-  async function runUpdate(target: Update) {
-    updating = 'downloading...'
-    try {
-      await installUpdate(target, (fraction) => {
-        updating = fraction === null ? 'downloading...' : `downloading ${Math.round(fraction * 100)}%`
-      })
-      updating = 'restarting...'
-    } catch (e) {
-      updating = `update failed: ${e}`
-    }
   }
 </script>
 
@@ -58,14 +41,7 @@
   </div>
 
   <footer>
-    <span class="update">
-      {#if updating}
-        # {updating}
-      {:else if update}
-        # update available: v{update.version}
-        <button type="button" onclick={() => runUpdate(update)}>update</button>
-      {/if}
-    </span>
+    <UpdateStatus />
     {#if version}<span class="version">v{version}</span>{/if}
   </footer>
 </section>
@@ -127,10 +103,6 @@
     align-items: center;
     justify-content: space-between;
     font-size: 12px;
-  }
-
-  .update {
-    color: var(--muted);
   }
 
   /* Barely there: for bug reports, not for reading. */

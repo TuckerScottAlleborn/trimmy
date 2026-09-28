@@ -36,6 +36,14 @@ struct Stream {
     avg_frame_rate: Option<String>,
     #[serde(default)]
     disposition: Disposition,
+    #[serde(default)]
+    side_data_list: Vec<SideData>,
+}
+
+#[derive(Deserialize)]
+struct SideData {
+    /// Degrees the player turns the picture (phones film portrait as rotated landscape).
+    rotation: Option<f64>,
 }
 
 #[derive(Deserialize, Default)]
@@ -59,6 +67,18 @@ pub fn parse(path: &str, json: &[u8]) -> Result<VideoInfo, String> {
         .iter()
         .find(|s| is(s, "video") && s.disposition.attached_pic == 0)
         .ok_or("That file has no video in it.")?;
+    let (width, height) = (video.width.unwrap_or(0), video.height.unwrap_or(0));
+    // Report the size as it's shown: a quarter turn swaps width and height.
+    let turned = video
+        .side_data_list
+        .iter()
+        .filter_map(|side| side.rotation)
+        .any(|degrees| (degrees.abs() % 180.0 - 90.0).abs() < 1.0);
+    let (width, height) = if turned {
+        (height, width)
+    } else {
+        (width, height)
+    };
     Ok(VideoInfo {
         path: path.to_owned(),
         name: Path::new(path).file_name().map_or_else(
@@ -70,8 +90,8 @@ pub fn parse(path: &str, json: &[u8]) -> Result<VideoInfo, String> {
             .and_then(|f| f.duration)
             .and_then(|d| d.parse().ok())
             .unwrap_or(0.0),
-        width: video.width.unwrap_or(0),
-        height: video.height.unwrap_or(0),
+        width,
+        height,
         fps: video.avg_frame_rate.as_deref().map_or(0.0, parse_rate),
         video_codec: video.codec_name.clone().unwrap_or_default(),
         audio_tracks: probe.streams.iter().filter(|s| is(s, "audio")).count(),
@@ -121,6 +141,19 @@ mod tests {
             "format": {"duration": "180.0"}
         }"#;
         assert!(parse("C:/Music/song.mp3", json).is_err());
+    }
+
+    #[test]
+    fn swaps_the_size_of_a_rotated_phone_video() {
+        let json = br#"{
+            "streams": [
+                {"codec_type": "video", "codec_name": "hevc", "width": 1920, "height": 1080,
+                 "side_data_list": [{"side_data_type": "Display Matrix", "rotation": -90}]}
+            ],
+            "format": {"duration": "3.0"}
+        }"#;
+        let info = parse("/Users/me/IMG_0001.MOV", json).unwrap();
+        assert_eq!((info.width, info.height), (1080, 1920));
     }
 
     #[test]

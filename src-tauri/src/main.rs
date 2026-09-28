@@ -1,7 +1,9 @@
 // Prevents an extra console window on Windows in release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod cache;
 mod export;
+mod keyframes;
 mod probe;
 mod waveform;
 
@@ -71,7 +73,16 @@ async fn open_video(
     if !output.status.success() {
         return Err("That doesn't look like a video file.".into());
     }
-    let info = probe::parse(&path, &output.stdout)?;
+    let mut info = probe::parse(&path, &output.stdout)?;
+    if info.duration <= 0.0 {
+        // No duration in the container (an interrupted recording): measure the video itself.
+        info.duration = keyframes::scan(&app, &path)
+            .await
+            .map_or(0.0, |scan| scan.end);
+        if info.duration <= 0.0 {
+            return Err("Trimmy can't tell how long that video is.".into());
+        }
+    }
 
     app.asset_protocol_scope()
         .allow_file(file)
@@ -108,15 +119,31 @@ async fn waveform(
     waveform::peaks(&app, &path, duration, buckets).await
 }
 
+/// Where `path`'s keyframes are (seconds), for snapping the start handle. Empty means any start works.
+#[tauri::command]
+async fn keyframes(
+    app: tauri::AppHandle,
+    opened: tauri::State<'_, OpenedFiles>,
+    path: String,
+) -> Result<Vec<f64>, String> {
+    opened.check(&path)?;
+    Ok(keyframes::scan(&app, &path).await?.keyframes)
+}
+
 /// A file macOS asked Trimmy to open (Finder's "Open With") that the UI hasn't picked up yet.
 #[derive(Default)]
 struct PendingOpen(Mutex<Option<String>>);
 
-/// The file Trimmy was started with ("Open with", or `trimmy.exe clip.mp4`), if any.
+/// The file Trimmy was started with ("Open with", or `trimmy clip.mp4` in a terminal), if any.
 #[tauri::command]
 fn launch_path(pending: tauri::State<PendingOpen>) -> Option<String> {
     let from_finder = pending.0.lock().ok().and_then(|mut p| p.take());
-    from_finder.or_else(|| std::env::args().nth(1))
+    from_finder.or_else(|| {
+        let arg = std::env::args().nth(1)?;
+        // A path typed in a terminal can be relative to the folder the terminal is in.
+        let full = std::env::current_dir().ok()?.join(arg);
+        Some(full.to_string_lossy().into_owned())
+    })
 }
 
 /// The window starts hidden (no flash of an empty frame); the UI calls this once it has drawn.
@@ -169,6 +196,7 @@ fn main() {
             open_video,
             export_clip,
             waveform,
+            keyframes,
             launch_path,
             ui_ready
         ])

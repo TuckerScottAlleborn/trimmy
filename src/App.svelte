@@ -3,11 +3,12 @@
   import { invoke } from '@tauri-apps/api/core'
   import { listen } from '@tauri-apps/api/event'
   import { getCurrentWebview } from '@tauri-apps/api/webview'
+  import { getCurrentWindow } from '@tauri-apps/api/window'
   import { open as pickFile } from '@tauri-apps/plugin-dialog'
   import { onMount } from 'svelte'
   import Editor from './lib/Editor.svelte'
   import OpenScreen from './lib/OpenScreen.svelte'
-  import { findUpdate, type Update } from './lib/update'
+  import { checkForUpdates } from './lib/updates.svelte'
   import { launchPath, openVideo, type VideoInfo } from './lib/video'
 
   const VIDEO_EXTENSIONS = ['mp4', 'mkv', 'mov', 'webm', 'avi', 'm4v', 'ts', 'mts', 'm2ts', 'wmv', 'flv', '3gp', 'mpg', 'mpeg']
@@ -16,14 +17,13 @@
   let error = $state('')
   let dragging = $state(false)
   let version = $state('')
-  let update = $state<Update | null>(null)
 
   // The window starts hidden; show it once the first frame is on screen, so there's no empty flash.
   onMount(() => requestAnimationFrame(() => requestAnimationFrame(() => invoke('ui_ready'))))
 
   getVersion().then((v) => (version = v))
   // Only looks for an update; installing waits for the user to click [update].
-  findUpdate().then((u) => (update = u))
+  checkForUpdates()
 
   async function open(path: string) {
     error = ''
@@ -43,6 +43,10 @@
     })
     if (path) await open(path)
   }
+
+  $effect(() => {
+    getCurrentWindow().setTitle(video ? `${video.name} - Trimmy` : 'Trimmy')
+  })
 
   function close() {
     video = null
@@ -69,7 +73,7 @@
 
   function onkeydown(event: KeyboardEvent) {
     // Ctrl+O on Windows, ⌘O on macOS.
-    if ((event.ctrlKey || event.metaKey) && event.key === 'o') {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'o') {
       event.preventDefault()
       browse()
     }
@@ -85,7 +89,7 @@
       <Editor {video} onclose={close} />
     {/key}
   {:else}
-    <OpenScreen onopen={open} onbrowse={browse} {version} {update} />
+    <OpenScreen onopen={open} onbrowse={browse} {version} />
   {/if}
   {#if error}
     <p class="error" role="alert">{error}</p>

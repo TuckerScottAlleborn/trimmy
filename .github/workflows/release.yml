@@ -1,7 +1,8 @@
 # Builds the installers and attaches them to a GitHub Release:
 #   Windows: NSIS setup.exe + MSI      macOS (untested): universal .dmg (Apple Silicon + Intel)
 # To release: bump the version (package.json, src-tauri/tauri.conf.json, src-tauri/Cargo.toml),
-# then push a tag like v0.1.0. The release is created as a draft; publish it on GitHub.
+# add its section to CHANGELOG.md, then push a tag like v1.0.0. The release is created as a
+# draft whose notes are that CHANGELOG section plus the install steps below; publish it on GitHub.
 # Every action is pinned to a full commit SHA (tag in the comment): the release jobs hold the
 # update signing key, so a moved tag must not be able to change what runs here.
 name: Release
@@ -17,6 +18,8 @@ permissions:
 env:
   TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
   RELEASE_BODY: |
+    ## Install
+
     ### Windows
     **Download `Trimmy_*_x64-setup.exe`** and run it. No admin rights and nothing else to install.
     (`Trimmy_*_x64_en-US.msi` is there too, for IT / Group Policy installs.)
@@ -63,6 +66,22 @@ jobs:
         working-directory: src-tauri
         run: cargo test
 
+      # The notes: this version's CHANGELOG.md section, then the install steps (RELEASE_BODY).
+      - name: Release notes
+        shell: bash
+        run: |
+          version="${TAG#v}"
+          # Windows runners check files out with CRLF line endings, hence the \r strip.
+          notes=$(awk -v heading="## $version" '{sub(/\r$/, "")} /^## /{on = ($0 == heading); next} on' CHANGELOG.md)
+          if [ -n "$TAG" ] && [ -z "$notes" ]; then
+            echo "::error::CHANGELOG.md has no '## $version' section"; exit 1
+          fi
+          {
+            echo 'RELEASE_NOTES<<END_OF_NOTES'
+            printf '%s\n\n%s\n' "$notes" "$RELEASE_BODY"
+            echo 'END_OF_NOTES'
+          } >> "$GITHUB_ENV"
+
       - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -72,7 +91,7 @@ jobs:
         with:
           tagName: ${{ env.TAG }}
           releaseName: Trimmy ${{ github.ref_name }}
-          releaseBody: ${{ env.RELEASE_BODY }}
+          releaseBody: ${{ env.RELEASE_NOTES }}
           releaseDraft: true
           # Also build the signed update files and latest.json (kept out of local builds, which
           # have no signing key). Windows updates use the per-user setup.exe, not the MSI.
@@ -120,6 +139,22 @@ jobs:
         working-directory: src-tauri
         run: cargo test
 
+      # The notes: this version's CHANGELOG.md section, then the install steps (RELEASE_BODY).
+      - name: Release notes
+        shell: bash
+        run: |
+          version="${TAG#v}"
+          # Windows runners check files out with CRLF line endings, hence the \r strip.
+          notes=$(awk -v heading="## $version" '{sub(/\r$/, "")} /^## /{on = ($0 == heading); next} on' CHANGELOG.md)
+          if [ -n "$TAG" ] && [ -z "$notes" ]; then
+            echo "::error::CHANGELOG.md has no '## $version' section"; exit 1
+          fi
+          {
+            echo 'RELEASE_NOTES<<END_OF_NOTES'
+            printf '%s\n\n%s\n' "$notes" "$RELEASE_BODY"
+            echo 'END_OF_NOTES'
+          } >> "$GITHUB_ENV"
+
       - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -129,7 +164,7 @@ jobs:
         with:
           tagName: ${{ env.TAG }}
           releaseName: Trimmy ${{ github.ref_name }}
-          releaseBody: ${{ env.RELEASE_BODY }}
+          releaseBody: ${{ env.RELEASE_NOTES }}
           releaseDraft: true
           args: --target universal-apple-darwin --config src-tauri/tauri.updater.conf.json
 

@@ -259,7 +259,7 @@ footer nav a::after { content: "]" / ""; color: var(--muted) }
 <ol role="list">
 <li><a href="{{winUrl}}">Download <code>{{winName}}</code></a><!--if:version--> ({{winSize}}, mostly FFmpeg)<!--/if:version-->.</li>
 <li>Run it. It installs just for you: no admin prompt, nothing else to install.</li>
-<li>If Windows says <b>"Windows protected your PC"</b>, click <b>More info</b>, then <b>Run anyway</b>. Trimmy isn't code-signed yet (a certificate costs money every year), so Windows is wary of it like any new download.</li>
+<li>If Windows says <b>"Windows protected your PC"</b>, click <b>More info</b>, then <b>Run anyway</b>. Trimmy isn't code-signed yet, so Windows is wary of it like any new download.</li>
 </ol>
 <p class="after c">needs windows 10 or 11, 64-bit. uninstall from settings &gt; apps.</p>
 </section>
@@ -275,8 +275,8 @@ footer nav a::after { content: "]" / ""; color: var(--muted) }
 <p>No. Trimmy copies the original video and audio into the new file as they are (an FFmpeg stream copy) instead of re-encoding them. That's also why it only takes a second.</p>
 </details>
 <details>
-<summary>Why does my clip start a bit before my start handle?</summary>
-<p>A stream copy can only start on a keyframe, so the clip starts at the last one before your handle: about a second early for ShadowPlay recordings, up to several seconds with OBS's default settings. The end is always exact. A frame-exact mode is on the roadmap.</p>
+<summary>Why does the start handle snap?</summary>
+<p>A stream copy can only start on a keyframe, so the start handle snaps to them (the faint ticks under the timeline), and the preview starts exactly where your clip will. ShadowPlay puts one about every second; OBS's default settings, up to every few seconds. The end handle doesn't snap. A frame-exact mode is on the roadmap.</p>
 </details>
 <details>
 <summary>Is there a Mac or Linux version?</summary>

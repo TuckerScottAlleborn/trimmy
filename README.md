@@ -48,6 +48,8 @@ videos, screen recordings, downloads, anything FFmpeg can read.
   kill, the shout) actually is.
 - **Lossless, near-instant export.** Trimmy copies the original video and audio as-is, with
   no re-encoding. A minute-long clip exports in about a second with zero quality loss.
+- **What you see is what you get.** The start handle snaps to the video's keyframes, so the
+  preview starts exactly where the exported clip will ([why](#how-export-works)).
 - **Keeps every audio track.** If you record game audio and your mic on separate tracks, both
   come through.
 - **Never touches your original.** The clip is saved next to it as `name_trimmed.mp4`, and
@@ -71,8 +73,9 @@ That's it. Trimmy appears in your Start menu.
 
 Most of that size is FFmpeg, bundled so there's nothing else to install.
 
-**"Windows protected your PC"?** The installer isn't code-signed yet (a signing certificate
-costs money every year), so Windows SmartScreen warns about any new download like this. Click
+**"Windows protected your PC"?** The installer isn't code-signed yet (see the
+[code signing policy](#code-signing-policy)), so Windows SmartScreen warns about any new download
+like this. Click
 **More info**, then **Run anyway**. The installers are built from this repository by
 [GitHub Actions](.github/workflows/release.yml), so you can see exactly what went into them.
 
@@ -84,18 +87,20 @@ costs money every year), so Windows SmartScreen warns about any new download lik
 
 ### Updating
 
-Trimmy checks GitHub for a newer version when it starts, and nothing else. If there is one, the
-open screen says `# update available: vX.Y.Z` with an **[update]** button. **Nothing is
-downloaded or installed unless you click it.** Clicking downloads the new version, verifies its
-signature (so only updates built by this project's release workflow are accepted), installs it,
-and restarts Trimmy. Offline, or no update? You'll see nothing at all.
+When Trimmy starts, it checks GitHub for a newer version, and nothing else. The open screen
+says `# checking for updates...`, then `# up to date` or `# update available: vX.Y.Z` with an
+**[update]** button. If you opened a video straight away, the same note shows small next to
+**[close]**. **Nothing is downloaded or installed unless you click [update].** Clicking downloads
+the new version, verifies its signature (so only updates built by this project's release
+workflow are accepted), installs it, and restarts Trimmy. Offline? The open screen says it
+couldn't check, with a **[retry]** button; the clip screen stays quiet.
 
 Your installed version is shown faintly in the bottom-right corner of the open screen.
 
 ### Uninstalling
 
-**Settings → Apps → Installed apps → Trimmy → Uninstall.** Your videos and exported clips are
-never touched.
+**Settings → Apps → Installed apps → Trimmy → Uninstall.** That also removes Trimmy from the
+**Open with** menu. Your videos and exported clips are never touched.
 
 ## macOS (untested)
 
@@ -134,7 +139,8 @@ Things that are likely to behave differently from Windows, but are unconfirmed:
 1. **Open a video.** Drag it onto the window, paste its full path into the box and press
    Enter, or click **[browse]** (Ctrl+O).
 2. **Set the start and end.** Drag the green handles on the timeline, or move the playhead
-   and press **I** (start here) and **O** (end here).
+   and press **I** (start here) and **O** (end here). The start handle snaps to keyframes, the
+   faint ticks along the bottom of the timeline ([why](#how-export-works)).
 3. **Check it.** Press **Space** to play; playback stops at the end handle.
 4. **Click [export].** The clip is saved next to the original. Click **[show in folder]** to
    find it.
@@ -150,35 +156,41 @@ Things that are likely to behave differently from Windows, but are unconfirmed:
 | **Shift** + **←** / **→** | Step one second |
 | **Ctrl+O** (⌘O on Mac) | Open a video |
 
-With a handle focused (click it or Tab to it), **←** / **→** nudge that handle instead.
+With a handle focused (click it or Tab to it), **←** / **→** nudge that handle instead: the end
+handle by a frame (a second with Shift), the start handle to the previous or next keyframe.
 
 ### Opening from Explorer or the command line
 
-The first time: right-click a video → **Open with** → **Choose another app** → **Choose an app
-on your PC**, and pick `trimmy.exe` from `%LOCALAPPDATA%\Trimmy`. After that, Trimmy is listed
-under **Open with** for that file type. You can also start it from a terminal or a script:
+Right-click a video → **Open with** → **Trimmy**. (On Windows 11, Trimmy may be under **Open
+with** → **Choose another app**.) The installer only adds Trimmy to that menu; your default
+video player stays the default.
+
+You can also start it from a terminal or a script, with a full or relative path:
 
 ```powershell
 & "$env:LOCALAPPDATA\Trimmy\trimmy.exe" "C:\Videos\clip.mp4"
 ```
 
-## How export works (and one thing to know)
+## How export works
 
 Trimmy exports with a *stream copy*: FFmpeg copies the compressed video and audio straight
 into the new file instead of decoding and re-encoding them. That's why it's instant and
 lossless, and why the file keeps its original codec, resolution and container.
 
 The catch: a stream copy can only **start on a keyframe**, a full picture that the frames after
-it are built from. So the clip starts at the last keyframe **at or before** your start handle.
+it are built from. So the start handle **snaps to keyframes**, shown as faint ticks along the
+bottom of the timeline, and the preview starts exactly where the export will. How far apart
+they are depends on what recorded the video:
 
-| Recorded with | Keyframes every | So your clip may start up to |
-| --- | --- | --- |
-| NVIDIA ShadowPlay / NVIDIA App | ~1 second | ~1 second early |
-| AMD ReLive, Xbox Game Bar | varies by settings | usually a second or two early |
-| OBS (default "auto" keyframes) | up to ~8 seconds | several seconds early |
+| Recorded with | Keyframes every |
+| --- | --- |
+| NVIDIA ShadowPlay / NVIDIA App | ~1 second |
+| AMD ReLive, Xbox Game Bar | varies by settings, usually 1 to 2 seconds |
+| OBS (default "auto" keyframes) | up to ~8 seconds (set **Keyframe Interval** to 1 s in OBS's output settings for finer starts) |
 
-The end is always exact. A frame-exact "precise" export mode (a quick re-encode, using your
-GPU when available) is on the roadmap.
+The end handle doesn't snap: the clip ends where you put it, give or take a few frames. A
+frame-exact "precise" export mode (a quick re-encode, using your GPU when available) is on the
+roadmap.
 
 ## Supported formats
 
@@ -202,11 +214,19 @@ Audio-only files (MP3, M4A, ...) are rejected: Trimmy is for video.
 
 ## Troubleshooting
 
-**"Trimmy can't preview this file yet."** The built-in player (Windows' WebView2) doesn't
-support that format; see the table above. Trimming and exporting still work.
+**"can't preview this file yet, but you can still trim and export it"** The built-in player
+(Windows' WebView2) doesn't support that format; see the table above. Trimming and exporting
+still work.
 
-**My clip starts a little before where I put the handle.** That's the keyframe rule; see
-[How export works](#how-export-works-and-one-thing-to-know).
+**My iPhone (or other phone) video doesn't preview.** Newer phones record HEVC (H.265). Windows
+only plays it with Microsoft's [HEVC Video Extensions](https://apps.microsoft.com/detail/9n4wgh0z6vhq);
+without them you can still trim with the timeline and export. Portrait videos stay portrait.
+
+**The start handle won't go exactly where I drag it.** It snaps to keyframes, the only places a
+lossless clip can start; see [How export works](#how-export-works).
+
+**"Trimmy can't tell how long that video is."** The file has no length stored and FFmpeg
+couldn't measure one. It is probably damaged or empty.
 
 **"There's no file at ..."** Paste the full path, including the drive letter, like
 `C:\Videos\clip.mp4`. Quotes around it (from Explorer's **Copy as path**) are fine.
@@ -272,7 +292,10 @@ doesn't need the Visual C++ Redistributable.
 npm run check                      # Svelte + TypeScript type check
 cd src-tauri && cargo test         # Rust unit tests
 cd src-tauri && cargo clippy --all-targets
+cd src-tauri && cargo fmt --check
 ```
+
+[CI](.github/workflows/ci.yml) runs all four on every push to `main` and every pull request.
 
 ### Test clips
 
@@ -293,19 +316,26 @@ src/                         UI (Svelte 5 + TypeScript)
   App.svelte                 Open screen vs. editor, drag and drop, Ctrl+O
   lib/OpenScreen.svelte      Path box and browse button
   lib/Editor.svelte          Preview, controls, keyboard shortcuts, export
-  lib/Timeline.svelte        Waveform, handles and playhead
-  lib/video.ts               Typed calls into the Rust side, time formatting
+  lib/Timeline.svelte        Waveform, keyframe ticks, handles and playhead
+  lib/UpdateStatus.svelte    "checking for updates" / [update], on both screens
+  lib/updates.svelte.ts      The update check and install (tauri-plugin-updater)
+  lib/video.ts               Typed calls into the Rust side, keyframe snapping, time formatting
 src-tauri/                   Rust backend (Tauri 2)
   src/main.rs                Tauri commands
   src/probe.rs               Reads ffprobe's report on a file
   src/export.rs              Cuts the clip (FFmpeg stream copy), names the output
+  src/keyframes.rs           Lists keyframes (and measures videos with no stored length)
   src/waveform.rs            Audio peaks for the timeline
+  src/cache.rs               On-disk cache for keyframes and waveforms
   tauri.conf.json            App, window and installer config
   tauri.macos.conf.json      macOS-only overrides (.dmg, Finder "Open With")
+  windows/open-with.*        Explorer "Open with" entries (NSIS hook, MSI fragment)
   icons/icon.svg             Glitch, the app icon (all other icons are generated from it)
 scripts/fetch-ffmpeg.mjs     Downloads the pinned FFmpeg sidecars and license
 scripts/make-test-clips.mjs  Builds the test clip set
+.github/workflows/ci.yml       Checks every push and pull request
 .github/workflows/release.yml  Builds the installers and drafts a GitHub Release
+CHANGELOG.md                 What changed in each release (becomes the release notes)
 ```
 
 ### How it fits together
@@ -324,10 +354,13 @@ To regenerate the icons after editing `src-tauri/icons/icon.svg`:
 
 ## Releasing
 
-1. Bump the version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`.
+1. Bump the version: `npm version X.Y.Z --no-git-tag-version`, then the same number in
+   `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` (the next build updates `Cargo.lock`).
    Installed copies only offer an update when this number goes up.
-2. Commit, then tag and push: `git tag v0.2.0 && git push origin v0.2.0`.
-3. The [Release workflow](.github/workflows/release.yml) builds the Windows installers, then
+2. Add a `## X.Y.Z` section to [CHANGELOG.md](CHANGELOG.md). It becomes the release notes, and
+   the release workflow fails without it.
+3. Commit, then tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+4. The [Release workflow](.github/workflows/release.yml) builds the Windows installers, then
    the universal macOS `.dmg` (running the Rust tests and a smoke test of the app bundle on a
    macOS machine), and attaches them all to one **draft** release. Check it, then click
    **Publish**.
@@ -426,6 +459,7 @@ app's `licenses` folder):
   separate program and is not linked into Trimmy. Its source code is available from
   [ffmpeg.org](https://ffmpeg.org/download.html#releases). The exact builds are the "essentials"
   Windows build by [gyan.dev](https://github.com/GyanD/codexffmpeg/releases/tag/9.0.2) and the
-  macOS builds by [Martin Riedl](https://ffmpeg.martin-riedl.de/).
+  macOS builds by [Martin Riedl](https://ffmpeg.martin-riedl.de/), unmodified. The source for
+  this exact version is [ffmpeg-9.0.2.tar.xz](https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz).
 - **[JetBrains Mono](https://www.jetbrains.com/lp/mono/)**, the UI font, under the SIL Open Font
   License 1.1.

@@ -1,0 +1,55 @@
+# Checks every push to main and every pull request: type check, formatting, lints and tests.
+# Holds no secrets; actions are pinned to full commit SHAs like the release workflow.
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['site/**', '**.md']
+  pull_request:
+    paths-ignore: ['site/**', '**.md']
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: stable
+          components: clippy, rustfmt
+
+      - uses: swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - name: Type check (Svelte + TypeScript)
+        run: npm run check
+
+      # Tauri's build script needs the bundled FFmpeg binaries to exist.
+      - run: node scripts/fetch-ffmpeg.mjs
+
+      - name: Rust formatting
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+      - name: Clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Rust tests
+        working-directory: src-tauri
+        run: cargo test

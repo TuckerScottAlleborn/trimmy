@@ -28,6 +28,36 @@ const WAVEFORM_BARS = 240
 export const loadWaveform = (video: VideoInfo) =>
   invoke<number[]>('waveform', { path: video.path, duration: video.duration, buckets: WAVEFORM_BARS })
 
+/** Keyframe times in seconds (sorted), or [] when any start works. Reads the whole file, so it's async. */
+export const loadKeyframes = (video: VideoInfo) => invoke<number[]>('keyframes', { path: video.path })
+
+/**
+ * Where a clip starting at `t` really starts: lossless export can only begin on a keyframe, so the
+ * last one at or before `t` (0 before the first). With no keyframe list, `t` itself.
+ */
+export function keyframeAtOrBefore(keyframes: number[], t: number): number {
+  if (keyframes.length === 0) return t
+  let low = 0
+  let high = keyframes.length - 1
+  let found = 0
+  while (low <= high) {
+    const mid = (low + high) >> 1
+    // A hair of tolerance so a start already on a keyframe stays put.
+    if (keyframes[mid] <= t + 1e-6) {
+      found = keyframes[mid]
+      low = mid + 1
+    } else {
+      high = mid - 1
+    }
+  }
+  return found
+}
+
+/** The first keyframe after `t`, or null. */
+export function keyframeAfter(keyframes: number[], t: number): number | null {
+  return keyframes.find((k) => k > t + 1e-6) ?? null
+}
+
 /** The file Trimmy was started with ("Open with"), if any. */
 export const launchPath = () => invoke<string | null>('launch_path')
 

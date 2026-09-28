@@ -1,8 +1,11 @@
 <script lang="ts">
+  import { formatTime, keyframeAfter, keyframeAtOrBefore } from './video'
+
   let {
     duration,
     time,
     peaks,
+    keyframes,
     step,
     start = $bindable(),
     end = $bindable(),
@@ -12,6 +15,8 @@
     time: number
     /** Audio loudness (0 to 1) in evenly spaced slices; drawn as the waveform. */
     peaks: number[]
+    /** Where the start handle can go (export starts on a keyframe); empty means anywhere. */
+    keyframes: number[]
     /** How far the arrow keys move a focused handle (one frame). */
     step: number
     start: number
@@ -27,8 +32,11 @@
 
   const percent = (t: number) => `${(t / duration) * 100}%`
 
+  /** Past this many keyframes the ticks would just be a solid smear, so they're left out. */
+  const MAX_TICKS = 400
+
   function setStart(t: number) {
-    start = Math.max(0, Math.min(t, end - MIN_LENGTH))
+    start = keyframeAtOrBefore(keyframes, Math.max(0, Math.min(t, end - MIN_LENGTH)))
     onseek(start)
   }
 
@@ -59,8 +67,12 @@
     event.preventDefault()
     event.stopPropagation() // don't also step the playhead
     const amount = by * (event.shiftKey ? 1 : step)
-    if (which === 'start') setStart(start + amount)
-    else setEnd(end + amount)
+    if (which === 'end') return setEnd(end + amount)
+    if (keyframes.length === 0) return setStart(start + amount)
+    // The start handle steps from keyframe to keyframe.
+    if (by < 0) return setStart(start - 1e-3)
+    const next = keyframeAfter(keyframes, start)
+    if (next !== null && next <= end - MIN_LENGTH) setStart(next)
   }
 </script>
 
@@ -77,6 +89,11 @@
       <i style:height="{Math.max(4, peak * 100)}%"></i>
     {/each}
   </div>
+  {#if keyframes.length > 0 && keyframes.length <= MAX_TICKS}
+    <svg class="ticks" viewBox="0 0 {duration} 1" preserveAspectRatio="none" aria-hidden="true">
+      <path d={keyframes.map((k) => `M${k} 0V1`).join('')} />
+    </svg>
+  {/if}
   <div class="outside" style:left="0" style:width={percent(start)}></div>
   <div class="outside" style:left={percent(end)} style:right="0"></div>
   <div class="clip" style:left={percent(start)} style:width={percent(end - start)}></div>
@@ -91,6 +108,8 @@
       aria-valuemin={0}
       aria-valuemax={duration}
       aria-valuenow={which === 'start' ? start : end}
+      aria-valuetext={formatTime(which === 'start' ? start : end)}
+      title={which === 'start' && keyframes.length > 0 ? 'Snaps to keyframes, where a lossless clip can start' : undefined}
       onpointerdown={(e) => grab(e, which)}
       onkeydown={(e) => nudge(e, which)}
     ></div>
@@ -120,6 +139,23 @@
     flex: 1;
     background: var(--accent);
     opacity: 0.75;
+  }
+
+  /* Keyframes: where the start handle can land. Faint, along the bottom edge. */
+  .ticks {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 6px;
+    pointer-events: none;
+  }
+
+  .ticks path {
+    stroke: var(--muted);
+    stroke-width: 1px;
+    vector-effect: non-scaling-stroke;
+    opacity: 0.6;
   }
 
   .outside {

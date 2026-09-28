@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The MSI's version of open-with.nsh: adds Trimmy to Explorer's "Open with" menu for video files
+  without making it the default app. The MSI installs for all users, so these go under HKLM, and
+  Windows Installer removes them on uninstall. Keep the extensions in sync with open-with.nsh.
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <DirectoryRef Id="INSTALLDIR">
+      <Component Id="OpenWith" Guid="6F1C1E0B-8E0B-4E36-9B5D-3A7C51D6A2E4">
+        <RegistryKey Root="HKLM" Key="Software\Classes\Trimmy.Video">
+          <RegistryValue Type="string" Value="Video" KeyPath="yes" />
+          <RegistryValue Key="DefaultIcon" Type="string" Value="&quot;[INSTALLDIR]trimmy.exe&quot;,0" />
+          <RegistryValue Key="shell\open\command" Type="string" Value="&quot;[INSTALLDIR]trimmy.exe&quot; &quot;%1&quot;" />
+        </RegistryKey>
+        <RegistryKey Root="HKLM" Key="Software\Classes\Applications\trimmy.exe">
+          <RegistryValue Name="FriendlyAppName" Type="string" Value="Trimmy" />
+          <RegistryValue Key="shell\open\command" Type="string" Value="&quot;[INSTALLDIR]trimmy.exe&quot; &quot;%1&quot;" />
+          <RegistryValue Key="SupportedTypes" Name=".mp4" Type="string" Value="" />
+          <RegistryValue Key="SupportedTypes" Name=".m4v" Type="string" Value="" />
+          <RegistryValue Key="SupportedTypes" Name=".mov" Type="string" Value="" />
+          <RegistryValue Key="SupportedTypes" Name=".mkv" Type="string" Value="" />
+          <RegistryValue Key="SupportedTypes" Name=".webm" Type="string" Value="" />
+          <RegistryValue Key="SupportedTypes" Name=".avi" Type="string" Value="" />
+          <RegistryValue Key="SupportedTypes" Name=".ts" Type="string" Value="" />
+          <RegistryValue Key="SupportedTypes" Name=".m2ts" Type="string" Value="" />
+          <RegistryValue Key="SupportedTypes" Name=".mts" Type="string" Value="" />
+          <RegistryValue Key="SupportedTypes" Name=".wmv" Type="string" Value="" />
+          <RegistryValue Key="SupportedTypes" Name=".flv" Type="string" Value="" />
+          <RegistryValue Key="SupportedTypes" Name=".3gp" Type="string" Value="" />
+          <RegistryValue Key="SupportedTypes" Name=".mpg" Type="string" Value="" />
+          <RegistryValue Key="SupportedTypes" Name=".mpeg" Type="string" Value="" />
+        </RegistryKey>
+        <RegistryValue Root="HKLM" Key="Software\Classes\.mp4\OpenWithProgids" Name="Trimmy.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.m4v\OpenWithProgids" Name="Trimmy.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.mov\OpenWithProgids" Name="Trimmy.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.mkv\OpenWithProgids" Name="Trimmy.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.webm\OpenWithProgids" Name="Trimmy.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.avi\OpenWithProgids" Name="Trimmy.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.ts\OpenWithProgids" Name="Trimmy.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.m2ts\OpenWithProgids" Name="Trimmy.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.mts\OpenWithProgids" Name="Trimmy.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.wmv\OpenWithProgids" Name="Trimmy.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.flv\OpenWithProgids" Name="Trimmy.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.3gp\OpenWithProgids" Name="Trimmy.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.mpg\OpenWithProgids" Name="Trimmy.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.mpeg\OpenWithProgids" Name="Trimmy.Video" Type="string" Value="" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>
