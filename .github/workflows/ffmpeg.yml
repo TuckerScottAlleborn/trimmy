@@ -56,7 +56,7 @@ jobs:
           cp build/ffmpeg.exe build/ffprobe.exe out/
           cp "ffmpeg-$FFMPEG_VERSION/COPYING.LGPLv2.1" out/LICENSE.txt
           grep FFMPEG_CONFIGURATION build/config.h | sed 's/^#define FFMPEG_CONFIGURATION //' > out/CONFIGURE.txt
-          ls -la out && cat out/CONFIGURE.txt
+          ls -la out && cat out/CONFIGURE.txt && test -s out/CONFIGURE.txt
           # The DLLs a static build must not need: only Windows system ones may show up.
           x86_64-w64-mingw32-objdump -p out/ffmpeg.exe | grep 'DLL Name' | sort -u
           cd out && zip -9 ../ffmpeg-windows-x86_64.zip *
@@ -109,8 +109,8 @@ jobs:
             lipo -info "out/$tool"
           done
           cp "ffmpeg-$FFMPEG_VERSION/COPYING.LGPLv2.1" out/LICENSE.txt
-          out/ffmpeg -hide_banner -buildconf | sed -n 's/^ *configuration: //p' > out/CONFIGURE.txt
-          ls -la out && cat out/CONFIGURE.txt
+          grep FFMPEG_CONFIGURATION build-arm64/config.h | sed 's/^#define FFMPEG_CONFIGURATION //' > out/CONFIGURE.txt
+          ls -la out && cat out/CONFIGURE.txt && test -s out/CONFIGURE.txt
           otool -L out/ffmpeg
           if arch -x86_64 /usr/bin/true 2>/dev/null; then arch -x86_64 out/ffmpeg -hide_banner -version | head -n 1; fi
           # zip keeps the executable bit, which an artifact upload would lose.
@@ -133,8 +133,8 @@ jobs:
         with:
           node-version: 22
 
-      # The full build that Trimmy bundled until now: it makes the test clips.
-      - run: node scripts/fetch-ffmpeg.mjs
+      # A full build, with encoders, makes the test clips.
+      - run: node scripts/fetch-ffmpeg.mjs --full
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -146,8 +146,8 @@ jobs:
           7z x -y -oslim ffmpeg-windows-x86_64.zip > /dev/null
           ls -la slim
           node scripts/ffmpeg-smoke.mjs \
-            --full src-tauri/bin/ffmpeg-x86_64-pc-windows-msvc.exe \
-            --full-probe src-tauri/bin/ffprobe-x86_64-pc-windows-msvc.exe \
+            --full src-tauri/bin/full/ffmpeg-x86_64-pc-windows-msvc.exe \
+            --full-probe src-tauri/bin/full/ffprobe-x86_64-pc-windows-msvc.exe \
             --ffmpeg slim/ffmpeg.exe --ffprobe slim/ffprobe.exe
 
   test-macos:
@@ -162,7 +162,7 @@ jobs:
         with:
           node-version: 22
 
-      - run: node scripts/fetch-ffmpeg.mjs
+      - run: node scripts/fetch-ffmpeg.mjs --full
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -173,8 +173,8 @@ jobs:
           mkdir slim && unzip -q ffmpeg-macos-universal.zip -d slim
           ls -la slim
           node scripts/ffmpeg-smoke.mjs \
-            --full src-tauri/bin/ffmpeg-aarch64-apple-darwin \
-            --full-probe src-tauri/bin/ffprobe-aarch64-apple-darwin \
+            --full src-tauri/bin/full/ffmpeg-aarch64-apple-darwin \
+            --full-probe src-tauri/bin/full/ffprobe-aarch64-apple-darwin \
             --ffmpeg slim/ffmpeg --ffprobe slim/ffprobe
 
   release:

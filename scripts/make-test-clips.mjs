@@ -8,7 +8,8 @@ import { dirname, extname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const binDir = join(root, 'src-tauri', 'bin')
+// Encoding needs the full FFmpeg; the one Trimmy bundles can't encode video.
+const binDir = join(root, 'src-tauri', 'bin', 'full')
 const outDir = join(root, 'test-clips')
 
 const [source, longAudio] = process.argv.slice(2)
@@ -18,7 +19,7 @@ if (!source || !existsSync(source) || (longAudio && !existsSync(longAudio))) {
 }
 const ffmpegFile = existsSync(binDir) && readdirSync(binDir).find((f) => f.startsWith('ffmpeg-'))
 if (!ffmpegFile) {
-  console.error('make-test-clips: FFmpeg is missing; run `node scripts/fetch-ffmpeg.mjs` first.')
+  console.error('make-test-clips: FFmpeg is missing; run `node scripts/fetch-ffmpeg.mjs --full` first.')
   process.exit(1)
 }
 const ffmpeg = join(binDir, ffmpegFile)
