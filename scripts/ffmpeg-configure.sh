@@ -8,6 +8,9 @@
 # .github/workflows/ffmpeg.yml. Everything Trimmy depends on is here, so both platforms ship the
 # same components. docs/slim-ffmpeg.md explains each choice; keep the two in sync.
 #
+# Optimized for speed, not --enable-small: -Os made the waveform of an hour-long recording
+# 10-20% slower (audio decoding is the one CPU-heavy thing Trimmy does) to save about a MB.
+#
 # What Trimmy runs:
 #   probe      ffprobe -show_format -show_streams (JSON), and -show_entries packet=... (compact)
 #   export     ffmpeg -ss -i -t -map 0:V:0 -map 0:a? -c copy (stream copy: demux, parse, mux)
@@ -45,8 +48,8 @@ decoders+=,pcm_f32le,pcm_u8,pcm_alaw,pcm_mulaw,pcm_dvd,pcm_bluray
   --disable-ffplay \
   --enable-ffmpeg \
   --enable-ffprobe \
-  --enable-small \
   --disable-debug \
+  --enable-lto \
   --enable-static \
   --disable-shared \
   --enable-zlib \
