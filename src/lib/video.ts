@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core'
+import { Channel, invoke } from '@tauri-apps/api/core'
 
 /** True on macOS, where shortcuts use ⌘ instead of Ctrl and paths look like /Users/... */
 export const isMac = navigator.userAgent.includes('Mac')
@@ -22,11 +22,23 @@ export const exportClip = (path: string, start: number, end: number) =>
   invoke<string>('export_clip', { path, start, end })
 
 /** How many bars the timeline waveform has. */
-const WAVEFORM_BARS = 240
+export const WAVEFORM_BARS = 240
 
-/** Peak loudness per slice of the video (0 to 1), or [] when it has no audio. */
-export const loadWaveform = (video: VideoInfo) =>
-  invoke<number[]>('waveform', { path: video.path, duration: video.duration, buckets: WAVEFORM_BARS })
+/**
+ * Peak loudness per slice of the video (0 to 1, scaled to the loudest), or [] when it has no
+ * audio. While FFmpeg reads the file, `onPeaks` gets each new batch of raw (unscaled) peaks in
+ * order, so the waveform can draw in; a cached waveform arrives all at once with no batches.
+ */
+export function loadWaveform(video: VideoInfo, onPeaks: (batch: number[]) => void) {
+  const progress = new Channel<number[]>()
+  progress.onmessage = onPeaks
+  return invoke<number[]>('waveform', {
+    path: video.path,
+    duration: video.duration,
+    buckets: WAVEFORM_BARS,
+    progress,
+  })
+}
 
 /** Keyframe times in seconds (sorted), or [] when any start works. Reads the whole file, so it's async. */
 export const loadKeyframes = (video: VideoInfo) => invoke<number[]>('keyframes', { path: video.path })

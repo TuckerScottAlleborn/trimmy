@@ -11,6 +11,7 @@
     keyframeAtOrBefore,
     loadKeyframes,
     loadWaveform,
+    WAVEFORM_BARS,
     type VideoInfo,
   } from './video'
 
@@ -30,13 +31,31 @@
   let progress = $state<number | null>(null)
   let saved = $state('')
   let exportError = $state('')
-  /** Audio peaks for the timeline; empty until FFmpeg has read them (or if there's no audio). */
+  /**
+   * Audio peaks for the timeline (0 to 1). While FFmpeg is still reading, slots it hasn't reached
+   * yet are -1 (drawn empty). Empty if there's no audio.
+   */
   let peaks = $state<number[]>([])
+  /** Raw peaks received so far, before scaling to the loudest. */
+  const partial: number[] = []
   /** Where a lossless clip can start; empty until ffprobe has listed them (or if any start works). */
   let keyframes = $state<number[]>([])
 
+  // Draw the waveform in as it's computed, scaled to the loudest part heard so far, so a long
+  // recording shows its start right away instead of an empty timeline.
+  function addPeaks(batch: number[]) {
+    partial.push(...batch)
+    const loudest = Math.max(...partial) || 1
+    peaks = Array.from({ length: Math.max(WAVEFORM_BARS, partial.length) }, (_, i) =>
+      i < partial.length ? partial[i] / loudest : -1,
+    )
+  }
+
   // svelte-ignore state_referenced_locally
-  loadWaveform(video).then((p) => (peaks = p), () => {})
+  loadWaveform(video, addPeaks).then(
+    (p) => (peaks = p),
+    () => (peaks = []),
+  )
   // svelte-ignore state_referenced_locally
   loadKeyframes(video).then(
     (k) => {

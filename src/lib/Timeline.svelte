@@ -13,7 +13,7 @@
   }: {
     duration: number
     time: number
-    /** Audio loudness (0 to 1) in evenly spaced slices; drawn as the waveform. */
+    /** Audio loudness (0 to 1) in evenly spaced slices; drawn as the waveform. -1 = not read yet. */
     peaks: number[]
     /** Where the start handle can go (export starts on a keyframe); empty means anywhere. */
     keyframes: number[]
@@ -86,7 +86,7 @@
 >
   <div class="wave">
     {#each peaks as peak, i (i)}
-      <i style:height="{Math.max(4, peak * 100)}%"></i>
+      <i style:height={peak < 0 ? '0' : `${Math.max(4, peak * 100)}%`}></i>
     {/each}
   </div>
   {#if keyframes.length > 0 && keyframes.length <= MAX_TICKS}

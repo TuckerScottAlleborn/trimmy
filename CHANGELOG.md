@@ -3,6 +3,11 @@
 What changed in each release. The release workflow copies a version's section into its GitHub
 release notes, so write it for people who use Trimmy.
 
+## Unreleased
+
+- **The waveform draws in as it's read.** On a long recording, the timeline fills from left to
+  right while FFmpeg works through the audio, instead of staying empty until it's done.
+
 ## 1.0.0
 
 The first stable release. If you have 0.2.x, click **[update]** on the open screen.

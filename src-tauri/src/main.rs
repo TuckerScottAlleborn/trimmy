@@ -107,6 +107,7 @@ async fn export_clip(
 }
 
 /// Peak loudness of `path`'s first audio track in `buckets` slices, for the timeline waveform.
+/// `progress` gets the raw peaks in batches while they're computed, so the waveform draws in.
 #[tauri::command]
 async fn waveform(
     app: tauri::AppHandle,
@@ -114,9 +115,10 @@ async fn waveform(
     path: String,
     duration: f64,
     buckets: u32,
+    progress: tauri::ipc::Channel<Vec<f32>>,
 ) -> Result<Vec<f32>, String> {
     opened.check(&path)?;
-    waveform::peaks(&app, &path, duration, buckets).await
+    waveform::peaks(&app, &path, duration, buckets, &progress).await
 }
 
 /// Where `path`'s keyframes are (seconds), for snapping the start handle. Empty means any start works.
