@@ -21,6 +21,10 @@ shift
 # names, not -f names: mpegps demuxes .mpg, mpeg1system and mpeg2vob mux it, tgp is .3gp, and
 # .m4v output goes through ipod.
 demuxers=mov,matroska,mpegts,avi,flv,asf,mpegps,ogg
+# MPEG-TS and MPEG-PS often don't say what a stream holds, so FFmpeg identifies it by running
+# these raw elementary-stream demuxers' probes on its data. Without them, a .mpg has no video and
+# some .m2ts files have no audio.
+demuxers+=,aac,ac3,eac3,mp3,dts,truehd,h264,hevc,mpegvideo,m4v,vc1
 muxers=mov,mp4,ipod,tgp,matroska,webm,mpegts,avi,flv,asf,mpeg1system,mpeg2vob,ogg,null
 
 # Parsers let stream copy find keyframes and read sizes and frame rates without decoding video.

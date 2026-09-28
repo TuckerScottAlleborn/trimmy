@@ -143,7 +143,7 @@ jobs:
       - name: Smoke test
         shell: bash
         run: |
-          mkdir slim && tar -xf ffmpeg-windows-x86_64.zip -C slim
+          7z x -y -oslim ffmpeg-windows-x86_64.zip > /dev/null
           ls -la slim
           node scripts/ffmpeg-smoke.mjs \
             --full src-tauri/bin/ffmpeg-x86_64-pc-windows-msvc.exe \
