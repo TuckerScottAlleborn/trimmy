@@ -1,0 +1,206 @@
+# Builds Trimmy's slim FFmpeg (scripts/ffmpeg-configure.sh) for Windows and macOS, checks it
+# against everything Trimmy does (scripts/ffmpeg-smoke.mjs), and attaches it to a DRAFT
+# pre-release tagged ffmpeg-<version>-<build>. Publish that release, then point
+# scripts/fetch-ffmpeg.mjs at it. Run by hand from the Actions tab; app releases never trigger it.
+#
+# The source tarball is pinned by SHA-256 (checked against FFmpeg's PGP signature when the hash
+# was recorded) and attached to the release, which covers the LGPL source offer.
+name: FFmpeg
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FFMPEG_VERSION: '9.0.2'
+  FFMPEG_SHA256: 8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e
+  # Bump for every new build of the same FFmpeg version (new flags, new toolchain).
+  BUILD: trimmy.1
+
+jobs:
+  windows:
+    # Cross-compiled with mingw-w64, the way most Windows FFmpeg builds are made: easier to pin
+    # than MSYS2 on a Windows runner.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Toolchain
+        run: sudo apt-get update && sudo apt-get install -y mingw-w64 nasm libz-mingw-w64-dev zip
+
+      - name: Source
+        run: |
+          curl -fsSLo ffmpeg.tar.xz "https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.xz"
+          echo "$FFMPEG_SHA256  ffmpeg.tar.xz" | sha256sum -c -
+          tar -xf ffmpeg.tar.xz
+
+      - name: Build
+        run: |
+          mkdir build && cd build
+          ../scripts/ffmpeg-configure.sh "../ffmpeg-$FFMPEG_VERSION" \
+            --extra-version="$BUILD" \
+            --enable-cross-compile --target-os=mingw32 --arch=x86_64 \
+            --cross-prefix=x86_64-w64-mingw32- \
+            --enable-w32threads \
+            --extra-ldflags=-static --pkg-config-flags=--static
+          make -j"$(nproc)"
+          x86_64-w64-mingw32-strip ffmpeg.exe ffprobe.exe
+
+      - name: Package
+        run: |
+          mkdir out
+          cp build/ffmpeg.exe build/ffprobe.exe out/
+          cp "ffmpeg-$FFMPEG_VERSION/COPYING.LGPLv2.1" out/LICENSE.txt
+          grep FFMPEG_CONFIGURATION build/config.h | sed 's/^#define FFMPEG_CONFIGURATION //' > out/CONFIGURE.txt
+          ls -la out && cat out/CONFIGURE.txt
+          # The DLLs a static build must not need: only Windows system ones may show up.
+          x86_64-w64-mingw32-objdump -p out/ffmpeg.exe | grep 'DLL Name' | sort -u
+          cd out && zip -9 ../ffmpeg-windows-x86_64.zip *
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ffmpeg-windows-x86_64
+          path: ffmpeg-windows-x86_64.zip
+
+  macos:
+    # Apple Silicon runner: arm64 natively, x86_64 cross-compiled, joined into universal binaries.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Toolchain
+        run: brew install nasm
+
+      - name: Source
+        run: |
+          curl -fsSLo ffmpeg.tar.xz "https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.xz"
+          echo "$FFMPEG_SHA256  ffmpeg.tar.xz" | shasum -a 256 -c -
+          tar -xf ffmpeg.tar.xz
+
+      - name: Build
+        run: |
+          for arch in arm64 x86_64; do
+            mkdir "build-$arch" && cd "build-$arch"
+            flags="-arch $arch -mmacosx-version-min=11.0"
+            if [ "$arch" = x86_64 ]; then
+              cross=(--enable-cross-compile --target-os=darwin --arch=x86_64)
+            else
+              cross=(--arch=aarch64)
+            fi
+            ../scripts/ffmpeg-configure.sh "../ffmpeg-$FFMPEG_VERSION" \
+              --extra-version="$BUILD" "${cross[@]}" --enable-pthreads \
+              --extra-cflags="$flags" --extra-ldflags="$flags"
+            make -j"$(sysctl -n hw.ncpu)"
+            cd ..
+          done
+
+      - name: Package
+        run: |
+          mkdir out
+          for tool in ffmpeg ffprobe; do
+            lipo -create "build-arm64/$tool" "build-x86_64/$tool" -output "out/$tool"
+            strip "out/$tool"
+            lipo -info "out/$tool"
+          done
+          cp "ffmpeg-$FFMPEG_VERSION/COPYING.LGPLv2.1" out/LICENSE.txt
+          out/ffmpeg -hide_banner -buildconf | sed -n 's/^ *configuration: //p' > out/CONFIGURE.txt
+          ls -la out && cat out/CONFIGURE.txt
+          otool -L out/ffmpeg
+          if arch -x86_64 /usr/bin/true 2>/dev/null; then arch -x86_64 out/ffmpeg -hide_banner -version | head -n 1; fi
+          # zip keeps the executable bit, which an artifact upload would lose.
+          cd out && zip -9 ../ffmpeg-macos-universal.zip *
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ffmpeg-macos-universal
+          path: ffmpeg-macos-universal.zip
+
+  test-windows:
+    needs: windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      # The full build that Trimmy bundled until now: it makes the test clips.
+      - run: node scripts/fetch-ffmpeg.mjs
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ffmpeg-windows-x86_64
+
+      - name: Smoke test
+        shell: bash
+        run: |
+          mkdir slim && tar -xf ffmpeg-windows-x86_64.zip -C slim
+          ls -la slim
+          node scripts/ffmpeg-smoke.mjs \
+            --full src-tauri/bin/ffmpeg-x86_64-pc-windows-msvc.exe \
+            --full-probe src-tauri/bin/ffprobe-x86_64-pc-windows-msvc.exe \
+            --ffmpeg slim/ffmpeg.exe --ffprobe slim/ffprobe.exe
+
+  test-macos:
+    needs: macos
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - run: node scripts/fetch-ffmpeg.mjs
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ffmpeg-macos-universal
+
+      - name: Smoke test
+        run: |
+          mkdir slim && unzip -q ffmpeg-macos-universal.zip -d slim
+          ls -la slim
+          node scripts/ffmpeg-smoke.mjs \
+            --full src-tauri/bin/ffmpeg-aarch64-apple-darwin \
+            --full-probe src-tauri/bin/ffprobe-aarch64-apple-darwin \
+            --ffmpeg slim/ffmpeg --ffprobe slim/ffprobe
+
+  release:
+    needs: [test-windows, test-macos]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          merge-multiple: true
+
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          curl -fsSLo "ffmpeg-$FFMPEG_VERSION.tar.xz" "https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.xz"
+          echo "$FFMPEG_SHA256  ffmpeg-$FFMPEG_VERSION.tar.xz" | sha256sum -c -
+          files=(ffmpeg-windows-x86_64.zip ffmpeg-macos-universal.zip "ffmpeg-$FFMPEG_VERSION.tar.xz")
+          sha256sum "${files[@]}" | tee SHA256SUMS.txt
+          tag="ffmpeg-$FFMPEG_VERSION-$BUILD"
+          notes="FFmpeg $FFMPEG_VERSION built for Trimmy by the [FFmpeg workflow](https://github.com/$GH_REPO/blob/$GITHUB_SHA/.github/workflows/ffmpeg.yml) at $GITHUB_SHA: only the components Trimmy uses ([scripts/ffmpeg-configure.sh](https://github.com/$GH_REPO/blob/$GITHUB_SHA/scripts/ffmpeg-configure.sh)), LGPL 2.1 or later. The unmodified FFmpeg source it was built from is attached. Not a Trimmy release."
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "${files[@]}" SHA256SUMS.txt --clobber
+          else
+            gh release create "$tag" "${files[@]}" SHA256SUMS.txt --draft --prerelease \
+              --target "$GITHUB_SHA" --title "FFmpeg $FFMPEG_VERSION for Trimmy ($BUILD)" --notes "$notes"
+          fi
