@@ -3,6 +3,7 @@
 
 mod cache;
 mod export;
+mod index;
 mod jobs;
 mod keyframes;
 mod probe;
@@ -77,9 +78,7 @@ async fn open_video(
     let mut info = probe::parse(&path, &output.stdout)?;
     if info.duration <= 0.0 {
         // No duration in the container (an interrupted recording): measure the video itself.
-        info.duration = keyframes::scan(&app, &path)
-            .await
-            .map_or(0.0, |scan| scan.end);
+        info.duration = keyframes::measure(&app, &path).await;
         if info.duration <= 0.0 {
             return Err("Trimmy can't tell how long that video is.".into());
         }

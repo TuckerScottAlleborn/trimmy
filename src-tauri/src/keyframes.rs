@@ -1,24 +1,28 @@
 //! Where a video's keyframes are. Lossless export can only start on one, so the start handle snaps
 //! to them and the preview shows exactly what the export will contain.
 //!
-//! The same pass measures how long the video really is, for files whose container never got a
-//! duration written (an interrupted OBS recording, for example).
+//! MP4, MOV and MKV files list their keyframes in an index (`index.rs`), which takes one small
+//! read. Anything else, or a file whose index is missing, gets a packet scan: ffprobe lists every
+//! video packet, which reads the whole file. That scan also measures how long the video really
+//! is, for files whose container never got a duration written (an interrupted OBS recording).
 
 use serde::{Deserialize, Serialize};
 use tauri_plugin_shell::{process::CommandEvent, ShellExt};
 
 use crate::cache::Cache;
+use crate::index::{self, Keyframes};
 use crate::jobs::{self, Kind};
 
 /// Bump when `Scan` or how it's computed changes, so old cache entries are ignored.
-const CACHE_VERSION: u32 = 2;
+const CACHE_VERSION: u32 = 3;
 
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Scan {
     /// Keyframe times in seconds from the start of the file, sorted. Empty when every frame is a
     /// keyframe (nothing to snap to) or the file couldn't be read.
     pub keyframes: Vec<f64>,
-    /// When the last video frame ends, in seconds from the start of the file (0 if unknown).
+    /// When the last video frame ends, in seconds from the start of the file. 0 if unknown, which
+    /// it always is when the keyframes came from the index.
     pub end: f64,
     /// True for containers whose seeking lands on the first keyframe *after* the requested time
     /// (MPEG transport and program streams); most others land on the one before.
@@ -44,12 +48,80 @@ impl Scan {
     }
 }
 
-/// Reads every video packet's timestamp and flags (no decoding, so it's about as fast as the disk).
+/// The video's keyframes: from the file's index if it has one, otherwise from a packet scan.
 pub async fn scan(app: &tauri::AppHandle, path: &str) -> Result<Scan, String> {
     let cache = Cache::for_file(app, "keyframes", path, CACHE_VERSION);
     if let Some(scan) = cache.as_ref().and_then(Cache::read) {
         return Ok(scan);
     }
+    if let Some(scan) = from_index(app, path).await {
+        if let Some(cache) = &cache {
+            cache.write(&scan);
+        }
+        return Ok(scan);
+    }
+    let scan = scan_packets(app, path).await?;
+    if let (Some(cache), true) = (&cache, scan.end > 0.0) {
+        cache.write(&scan);
+    }
+    Ok(scan)
+}
+
+/// How long the video really is, measured from its packets (0 if they can't be read). For files
+/// whose container doesn't say.
+pub async fn measure(app: &tauri::AppHandle, path: &str) -> f64 {
+    scan_packets(app, path).await.map_or(0.0, |scan| scan.end)
+}
+
+/// Keyframes from the container's index, made relative to the file's start like a packet scan's.
+async fn from_index(app: &tauri::AppHandle, path: &str) -> Option<Scan> {
+    let owned = path.to_owned();
+    let found = tauri::async_runtime::spawn_blocking(move || index::read(&owned))
+        .await
+        .ok()??;
+    let keyframes = match found {
+        Keyframes::All => Vec::new(),
+        Keyframes::At(times) => {
+            let start = start_time(app, path).await?;
+            let mut keyframes: Vec<f64> = times.iter().map(|t| (t - start).max(0.0)).collect();
+            keyframes.dedup();
+            keyframes
+        }
+    };
+    Some(Scan {
+        keyframes,
+        end: 0.0,
+        seeks_forward: false,
+    })
+}
+
+/// The file's start time as FFmpeg sees it (what `-ss 0` means), from its header only.
+async fn start_time(app: &tauri::AppHandle, path: &str) -> Option<f64> {
+    let output = app
+        .shell()
+        .sidecar("ffprobe")
+        .ok()?
+        .args([
+            "-v",
+            "error",
+            "-show_entries",
+            "format=start_time",
+            "-of",
+            "csv=p=0",
+        ])
+        .arg(path)
+        .output()
+        .await
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    Some(text.trim().parse().unwrap_or(0.0))
+}
+
+/// Reads every video packet's timestamp and flags (no decoding, so it's about as fast as the disk).
+async fn scan_packets(app: &tauri::AppHandle, path: &str) -> Result<Scan, String> {
     let command = app
         .shell()
         .sidecar("ffprobe")
@@ -83,11 +155,7 @@ pub async fn scan(app: &tauri::AppHandle, path: &str) -> Result<Scan, String> {
     if !ok {
         return Err("Couldn't read the video's keyframes.".into());
     }
-    let scan = parse(&text);
-    if let (Some(cache), true) = (&cache, scan.end > 0.0) {
-        cache.write(&scan);
-    }
-    Ok(scan)
+    Ok(parse(&text))
 }
 
 /// Parses `ffprobe -of compact` lines such as

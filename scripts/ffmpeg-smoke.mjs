@@ -156,8 +156,9 @@ for (const clip of CLIPS) {
         starts.map((_, i) => `[${i}:a:0]aformat=channel_layouts=mono,aresample=8000,apad=whole_len=2000,atrim=end_sample=2000[s${i}];`).join('') +
         starts.map((_, i) => `[s${i}]`).join('') +
         `concat=n=${starts.length}:v=0:a=1,asetnsamples=n=2000:p=0,` +
-        WAVEFORM.slice(WAVEFORM.indexOf('astats'))
-      const sampled = run(opt.ffmpeg, ['-hide_banner', '-nostdin', '-loglevel', 'error', ...inputs, '-filter_complex', graph, '-f', 'null', '-'])
+        WAVEFORM.slice(WAVEFORM.indexOf('astats')) +
+        '[peaks]'
+      const sampled = run(opt.ffmpeg, ['-hide_banner', '-nostdin', '-loglevel', 'error', ...inputs, '-filter_complex', graph, '-map', '[peaks]', '-f', 'null', '-'])
       const got = (sampled.stdout.match(/Peak_level=/g) ?? []).length
       if (sampled.status !== 0 || got !== starts.length) {
         problems.push(`sampled waveform: ${got} of ${starts.length} peaks, ${sampled.stderr.trim().split('\n').pop() || 'exit ' + sampled.status}`)

@@ -130,9 +130,11 @@ async fn sample(
                 .args(["-ss", &format!("{start:.3}"), "-t", &format!("{slice:.3}")])
                 .args(["-i", path]);
         }
+        // Only the graph's output: otherwise FFmpeg also tries to pass the video through, which
+        // the bundled build can't encode.
         let command = command
             .args(["-filter_complex", &sample_filter(points.len(), samples)])
-            .args(["-f", "null", "-"]);
+            .args(["-map", "[peaks]", "-f", "null", "-"]);
         let before = peaks.len();
         let ok = run(app, path, command, &mut peaks, progress).await;
         if !ok || peaks.len() != before + points.len() {
@@ -148,7 +150,8 @@ async fn sample(
 }
 
 /// The filter graph for one sampled run: each input's first audio track, mono at 8 kHz, cut or
-/// padded to exactly `samples`, then all of them in order through the peak meter.
+/// padded to exactly `samples`, then all of them in order through the peak meter, out as
+/// `[peaks]`.
 fn sample_filter(inputs: usize, samples: f64) -> String {
     let mut graph = String::new();
     for i in 0..inputs {
@@ -161,7 +164,7 @@ fn sample_filter(inputs: usize, samples: f64) -> String {
         graph += &format!("[s{i}]");
     }
     graph += &format!(
-        "concat=n={inputs}:v=0:a=1,asetnsamples=n={samples}:p=0,{}",
+        "concat=n={inputs}:v=0:a=1,asetnsamples=n={samples}:p=0,{}[peaks]",
         measure()
     );
     graph
