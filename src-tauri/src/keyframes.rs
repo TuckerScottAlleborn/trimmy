@@ -7,11 +7,12 @@
 //! is, for files whose container never got a duration written (an interrupted OBS recording).
 
 use serde::{Deserialize, Serialize};
+use tauri::Manager;
 use tauri_plugin_shell::{process::CommandEvent, ShellExt};
 
 use crate::cache::Cache;
 use crate::index::{self, Keyframes};
-use crate::jobs::{self, Kind};
+use crate::jobs::{self, Jobs, Kind};
 
 /// Bump when `Scan` or how it's computed changes, so old cache entries are ignored.
 const CACHE_VERSION: u32 = 3;
@@ -121,7 +122,10 @@ async fn start_time(app: &tauri::AppHandle, path: &str) -> Option<f64> {
 }
 
 /// Reads every video packet's timestamp and flags (no decoding, so it's about as fast as the disk).
+/// Waits while the waveform is reading the whole file, so the two don't make a hard drive thrash.
 async fn scan_packets(app: &tauri::AppHandle, path: &str) -> Result<Scan, String> {
+    let reader = app.state::<Jobs>().reader(path);
+    let _reading = reader.lock().await;
     let command = app
         .shell()
         .sidecar("ffprobe")

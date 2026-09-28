@@ -3,10 +3,12 @@
 //! Two ways to get it:
 //! - **Full** (most files): FFmpeg reads the whole audio track once and reports each bucket's
 //!   peak. Exact, and quick for game clips and anything else up to a few GB.
-//! - **Sampled** (big or long files): FFmpeg jumps to the middle of each bucket and measures half
-//!   a second there. A 38 GB movie on a USB hard drive takes about half a minute this way instead
+//! - **Sampled** (files over 4 GB): FFmpeg jumps to the middle of each bucket and measures half a
+//!   second there. A 38 GB movie on a USB hard drive takes about half a minute this way instead
 //!   of an hour, since it reads a few hundred small pieces instead of every byte of the video.
-//!   With a bucket per 30 s of a two-hour film, the overview looks the same.
+//!   With a bucket per 30 s of a two-hour film, the overview looks the same. Each point costs
+//!   about 0.1 s even from an SSD (FFmpeg re-reads the file's index for each), so smaller files,
+//!   however long, are faster read in full.
 //!
 //! Either way the peaks stream to the UI as they arrive, so the waveform draws left to right, and
 //! results are cached on disk (see `cache.rs`), so reopening a file skips FFmpeg.
@@ -28,9 +30,8 @@ const KEY: &str = "lavfi.astats.Overall.Peak_level=";
 /// How often a batch of new peaks goes to the UI: smooth to watch, few enough messages to be free.
 const SEND_EVERY: Duration = Duration::from_millis(80);
 
-/// Files bigger than this, or longer than `SAMPLE_OVER_SECONDS`, get the sampled waveform.
-const SAMPLE_OVER_BYTES: u64 = 2_000_000_000;
-const SAMPLE_OVER_SECONDS: f64 = 45.0 * 60.0;
+/// Files bigger than this get the sampled waveform.
+const SAMPLE_OVER_BYTES: u64 = 4_000_000_000;
 /// How much audio the sampled waveform measures in each bucket.
 const SLICE_SECONDS: f64 = 0.5;
 /// Buckets per FFmpeg run in sampled mode. Each run costs about a second to open the file; more
@@ -51,18 +52,23 @@ pub async fn peaks(
         return Ok(Vec::new());
     }
     let size = std::fs::metadata(path).map_or(0, |m| m.len());
-    let sampled = size > SAMPLE_OVER_BYTES || duration > SAMPLE_OVER_SECONDS;
+    let sampled = size > SAMPLE_OVER_BYTES;
     // Sampled and full waveforms of the same file are cached separately.
     let variant = if sampled { buckets | 1 << 31 } else { buckets };
     let cache = Cache::for_file(app, "waveforms", path, variant);
     if let Some(peaks) = cache.as_ref().and_then(Cache::read) {
         return Ok(peaks);
     }
+    // A keyframe packet scan (for a file with no index) waits until this is done, so the two
+    // don't make a hard drive seek back and forth between them.
+    let reader = app.state::<Jobs>().reader(path);
+    let reading = reader.lock().await;
     let raw = if sampled {
         sample(app, path, duration, buckets, progress).await
     } else {
         read_all(app, path, duration, buckets, progress).await
     };
+    drop(reading);
     let peaks = normalize(raw);
     // An empty result may be a failed or stopped FFmpeg run rather than a silent file, so it
     // isn't cached.

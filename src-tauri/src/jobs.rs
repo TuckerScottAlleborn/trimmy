@@ -6,7 +6,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use tauri::async_runtime::Receiver;
 use tauri::Manager;
@@ -36,6 +36,10 @@ pub struct Jobs {
     /// work that was still to start (the next batch of a sampled waveform, the keyframe lookup
     /// that waits for the waveform) doesn't start after all.
     closed: Mutex<HashSet<String>>,
+    /// One lock per file for the work that reads all of it (the full waveform, the packet scan),
+    /// so two such reads never run at once: on a hard drive, two readers of one big file make it
+    /// seek back and forth and each crawls.
+    readers: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
 }
 
 /// A started run. Dropping it (when the run ends, however it ends) forgets it.
@@ -106,6 +110,12 @@ impl Jobs {
         if let Ok(mut closed) = self.closed.lock() {
             closed.remove(path);
         }
+    }
+
+    /// The lock to hold while reading the whole of `path`.
+    pub fn reader(&self, path: &str) -> Arc<tokio::sync::Mutex<()>> {
+        let mut readers = self.readers.lock().unwrap_or_else(|e| e.into_inner());
+        readers.entry(path.to_owned()).or_default().clone()
     }
 
     pub fn is_closed(&self, path: &str) -> bool {

@@ -54,7 +54,7 @@
   }
 
   // svelte-ignore state_referenced_locally
-  const waveformDone = loadWaveform(video, addPeaks).then(
+  loadWaveform(video, addPeaks).then(
     (p) => (peaks = p),
     () => (peaks = []),
   )
@@ -62,10 +62,10 @@
   // drive that can otherwise go on for a long time after it's gone from the screen.
   onDestroy(() => void closeVideo(video.path))
 
-  // After the waveform, not alongside it: when the file has no index to read, the keyframe scan
-  // reads the whole file too, and two readers at once make a hard drive thrash.
+  // Usually instant (read from the file's index). When the file has no index, Rust scans it, but
+  // only after the waveform has finished reading, so the two don't fight over a slow drive.
   // svelte-ignore state_referenced_locally
-  waveformDone.then(() => loadKeyframes(video)).then(
+  loadKeyframes(video).then(
     (k) => {
       keyframes = k
       start = keyframeAtOrBefore(k, start)
