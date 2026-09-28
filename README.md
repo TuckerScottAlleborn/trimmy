@@ -45,7 +45,8 @@ videos, screen recordings, downloads, anything FFmpeg can read.
 - **Four ways to open a file:** drag it onto the window, paste its path, browse for it
   (Ctrl+O), or right-click it in Explorer and choose **Open with → Trimmy**.
 - **A timeline with the audio waveform,** so you can see where the action (the shot, the
-  kill, the shout) actually is.
+  kill, the shout) actually is. It draws in as it's read, and even a two-hour movie on a USB
+  hard drive gets one in a minute or two.
 - **Lossless, near-instant export.** Trimmy copies the original video and audio as-is, with
   no re-encoding. A minute-long clip exports in about a second with zero quality loss.
 - **What you see is what you get.** The start handle snaps to the video's keyframes, so the
@@ -68,10 +69,11 @@ That's it. Trimmy appears in your Start menu.
 
 | File | Use it when |
 | --- | --- |
-| `Trimmy_x.y.z_x64-setup.exe` (~60 MB) | **Almost always.** Per-user install, no admin rights needed. |
-| `Trimmy_x.y.z_x64_en-US.msi` (~80 MB) | You're deploying to many PCs (Intune, Group Policy). Installs for all users and needs admin. |
+| `Trimmy_x.y.z_x64-setup.exe` (~7 MB) | **Almost always.** Per-user install, no admin rights needed. |
+| `Trimmy_x.y.z_x64_en-US.msi` (~10 MB) | You're deploying to many PCs (Intune, Group Policy). Installs for all users and needs admin. |
 
-Most of that size is FFmpeg, bundled so there's nothing else to install.
+FFmpeg is bundled, so there's nothing else to install. It's a trimmed-down build with only the
+parts Trimmy uses ([details](#the-bundled-ffmpeg)), which is why the download is this small.
 
 **"Windows protected your PC"?** The installer isn't code-signed yet (see the
 [code signing policy](#code-signing-policy)), so Windows SmartScreen warns about any new download
@@ -275,8 +277,9 @@ npm run tauri dev      # run the app with hot reload
 npm run tauri build    # build both installers (see below)
 ```
 
-The first `npm run tauri ...` downloads a pinned, SHA-256-verified FFmpeg build (about 110 MB)
-into `src-tauri/bin/`, which is gitignored. After that it's skipped.
+The first `npm run tauri ...` downloads Trimmy's own FFmpeg build (about 5 MB, pinned by
+SHA-256; see [The bundled FFmpeg](#the-bundled-ffmpeg)) into `src-tauri/bin/`, which is
+gitignored. After that it's skipped.
 
 `npm run tauri build` produces:
 
@@ -307,7 +310,30 @@ podcast), used to build an hour-long video by looping the clip under it:
 npm run test-clips -- "C:\path\to\clip.mp4" ["C:\path\to\long-audio.mp3"]
 ```
 
-They land in `test-clips/` (gitignored).
+They land in `test-clips/` (gitignored). Making them needs a full FFmpeg with encoders, which
+the bundled one doesn't have, so fetch one first with `node scripts/fetch-ffmpeg.mjs --full`
+(into `src-tauri/bin/full/`, also gitignored).
+
+### The bundled FFmpeg
+
+Trimmy only asks FFmpeg to read files, copy streams and measure audio, so it ships a build with
+just that: every container Trimmy opens, the parsers stream copy needs, audio decoders for the
+waveform, and no video decoders or encoders at all. It's about 5 MB per program instead of about
+100 MB, it starts faster (probing a file takes a quarter of the time), and with no GPL parts it's
+licensed under the LGPL.
+
+- [`scripts/ffmpeg-configure.sh`](scripts/ffmpeg-configure.sh) is the whole build recipe: which
+  components are in, and why.
+- The [FFmpeg workflow](.github/workflows/ffmpeg.yml) (run by hand) builds it for Windows
+  (cross-compiled with mingw-w64) and macOS (arm64 + x86_64, joined), from FFmpeg's release
+  tarball pinned by SHA-256. [`scripts/ffmpeg-smoke.mjs`](scripts/ffmpeg-smoke.mjs) then checks it
+  against everything Trimmy does, on 21 test clips across its containers and codecs, and the workflow
+  attaches the zips and the source tarball to a draft pre-release named `ffmpeg-<version>-<build>`.
+- To update it: change the recipe or the version, bump `BUILD` in the workflow, run it, publish
+  the pre-release, and copy the printed SHA-256 sums into
+  [`scripts/fetch-ffmpeg.mjs`](scripts/fetch-ffmpeg.mjs).
+
+Design notes and measurements: [docs/slim-ffmpeg.md](docs/slim-ffmpeg.md).
 
 ### Project layout
 
@@ -324,16 +350,21 @@ src-tauri/                   Rust backend (Tauri 2)
   src/main.rs                Tauri commands
   src/probe.rs               Reads ffprobe's report on a file
   src/export.rs              Cuts the clip (FFmpeg stream copy), names the output
-  src/keyframes.rs           Lists keyframes (and measures videos with no stored length)
-  src/waveform.rs            Audio peaks for the timeline
+  src/keyframes.rs           Keyframe times, from the index or a packet scan; measures length
+  src/index.rs               Reads keyframes from MP4/MOV and MKV/WebM indexes
+  src/waveform.rs            Audio peaks for the timeline (full read, or sampled for big files)
+  src/jobs.rs                Tracks FFmpeg runs so closing a file or Trimmy stops them
   src/cache.rs               On-disk cache for keyframes and waveforms
   tauri.conf.json            App, window and installer config
   tauri.macos.conf.json      macOS-only overrides (.dmg, Finder "Open With")
   windows/open-with.*        Explorer "Open with" entries (NSIS hook, MSI fragment)
   icons/icon.svg             Glitch, the app icon (all other icons are generated from it)
-scripts/fetch-ffmpeg.mjs     Downloads the pinned FFmpeg sidecars and license
+scripts/fetch-ffmpeg.mjs     Downloads the pinned FFmpeg sidecars and license (--full: a full build)
+scripts/ffmpeg-configure.sh  The bundled FFmpeg's build recipe
+scripts/ffmpeg-smoke.mjs     Checks an FFmpeg build against everything Trimmy does
 scripts/make-test-clips.mjs  Builds the test clip set
 .github/workflows/ci.yml       Checks every push and pull request
+.github/workflows/ffmpeg.yml   Builds the bundled FFmpeg (run by hand)
 .github/workflows/release.yml  Builds the installers and drafts a GitHub Release
 CHANGELOG.md                 What changed in each release (becomes the release notes)
 ```
@@ -401,8 +432,9 @@ update check against this repository's GitHub releases.
   this project's key, only when the version number goes up, and only after you click
   **[update]**. A tampered download is refused.
 - **Reproducible pipeline.** Installers are built by [GitHub Actions](.github/workflows/release.yml)
-  from this repository. Every action is pinned to an exact commit, and FFmpeg is downloaded from
-  pinned URLs and checked against SHA-256 hashes.
+  from this repository. Every action is pinned to an exact commit, and the bundled FFmpeg is
+  built by this repository's [FFmpeg workflow](.github/workflows/ffmpeg.yml) from FFmpeg's
+  source, pinned by SHA-256 (checked against FFmpeg's release signature when it was pinned).
 
 The installers aren't code-signed yet, which is why Windows and macOS warn on first install.
 
@@ -423,8 +455,9 @@ program for open-source projects: *free code signing provided by
 This applies from the first release after the project is approved; earlier releases are unsigned.
 
 - Only binaries built by this repository's [release workflow](.github/workflows/release.yml),
-  from this repository's source code, are signed. The bundled FFmpeg is built by third parties
-  (see [License](#license)).
+  from this repository's source code, are signed. The bundled FFmpeg is third-party code:
+  FFmpeg's unmodified source, compiled by this repository's FFmpeg workflow (see
+  [License](#license)).
 - **Committers and reviewers:** [Tucker Scott Alleborn](https://github.com/TuckerScottAlleborn)
 - **Approvers** (who approve each signing request): [Tucker Scott Alleborn](https://github.com/TuckerScottAlleborn)
 - Everyone in these roles uses two-factor authentication. Found a problem? Please report it privately through
@@ -432,8 +465,6 @@ This applies from the first release after the project is approved; earlier relea
 
 ## Roadmap
 
-- A slim FFmpeg build with only what Trimmy uses: a ~10 MB installer instead of ~60 MB, and a
-  faster first open after a reboot ([design notes](docs/future-slim-ffmpeg.md))
 - Precise (frame-exact) export, GPU-accelerated
 - Preview for formats WebView2 can't play (HEVC without the extension, TS, AVI)
 - Remove audio / pick which audio track to keep
@@ -455,11 +486,11 @@ Trimmy is released under the [MIT License](LICENSE).
 It bundles third-party software, each under its own license (copies are installed in the
 app's `licenses` folder):
 
-- **[FFmpeg](https://ffmpeg.org)** 9.0.2, licensed under the **GNU GPL v3**. It runs as a
-  separate program and is not linked into Trimmy. Its source code is available from
-  [ffmpeg.org](https://ffmpeg.org/download.html#releases). The exact builds are the "essentials"
-  Windows build by [gyan.dev](https://github.com/GyanD/codexffmpeg/releases/tag/9.0.2) and the
-  macOS builds by [Martin Riedl](https://ffmpeg.martin-riedl.de/), unmodified. The source for
-  this exact version is [ffmpeg-9.0.2.tar.xz](https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz).
+- **[FFmpeg](https://ffmpeg.org)** 9.0.2, licensed under the **GNU LGPL 2.1 or later**. It runs
+  as a separate program and is not linked into Trimmy. The bundled build is compiled from
+  FFmpeg's unmodified source with no GPL or non-free parts ([how](#the-bundled-ffmpeg)); that
+  exact source, the build recipe and the binaries are attached to the
+  [`ffmpeg-9.0.2-trimmy.3`](https://github.com/TuckerScottAlleborn/trimmy/releases/tag/ffmpeg-9.0.2-trimmy.3)
+  release.
 - **[JetBrains Mono](https://www.jetbrains.com/lp/mono/)**, the UI font, under the SIL Open Font
   License 1.1.

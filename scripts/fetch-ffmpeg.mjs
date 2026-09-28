@@ -16,14 +16,14 @@ const VERSION = '9.0.2'
 
 // ---- Slim: Trimmy's own LGPL build with only what it uses (scripts/ffmpeg-configure.sh), made by
 // .github/workflows/ffmpeg.yml and published as a pre-release of this repository.
-const SLIM_BUILD = `${VERSION}-trimmy.1`
+const SLIM_BUILD = `${VERSION}-trimmy.3`
 const SLIM_URL = `https://github.com/TuckerScottAlleborn/trimmy/releases/download/ffmpeg-${SLIM_BUILD}`
 const SLIM = {
   stamp: SLIM_BUILD,
   windows: [
     {
       url: `${SLIM_URL}/ffmpeg-windows-x86_64.zip`,
-      sha256: 'SLIM_WINDOWS_SHA256',
+      sha256: '62da791210dabd7b8b8854e3f51d19eaef7d97f39d72d90bff5501cfa3b3aed7',
       unzip: {
         'ffmpeg.exe': 'ffmpeg-x86_64-pc-windows-msvc.exe',
         'ffprobe.exe': 'ffprobe-x86_64-pc-windows-msvc.exe',
@@ -35,7 +35,7 @@ const SLIM = {
   macos: [
     {
       url: `${SLIM_URL}/ffmpeg-macos-universal.zip`,
-      sha256: 'SLIM_MACOS_SHA256',
+      sha256: '62986b48e96650d5348fc340960525c6de89bc4a3727b5d4009506a6751f92c4',
       unzip: {
         ffmpeg: 'ffmpeg-universal-apple-darwin',
         ffprobe: 'ffprobe-universal-apple-darwin',
@@ -89,7 +89,7 @@ const FULL = {
 }
 
 // What `npm run tauri ...` bundles.
-const BUNDLED = FULL
+const BUNDLED = SLIM
 
 const full = process.argv.includes('--full')
 const build = full ? FULL : BUNDLED

@@ -1,10 +1,42 @@
-# Future: a slim FFmpeg build
+# The slim FFmpeg build
 
-Status: idea, not started. Nothing here is implemented yet.
+Status: **shipped in Trimmy 1.0.1** (build `9.0.2-trimmy.3`). The build recipe is
+[`scripts/ffmpeg-configure.sh`](../scripts/ffmpeg-configure.sh), which is the source of truth; the
+[FFmpeg workflow](../.github/workflows/ffmpeg.yml) builds and tests it, and the README's
+[The bundled FFmpeg](../README.md#the-bundled-ffmpeg) says how to update it. The rest of this file
+is the original design, kept for the reasoning; where the recipe differs, the recipe wins.
 
-Trimmy ships a general-purpose FFmpeg and uses maybe 1% of it. A custom build with only the
-parts Trimmy calls would make the installer several times smaller and the first run after a
-reboot faster.
+## Result
+
+Measured on the author's PC (Windows 10, a loaded machine, so times are rough):
+
+| | Before (gyan.dev GPL build) | After (`trimmy.3`) |
+|---|---|---|
+| Windows `ffmpeg.exe` / `ffprobe.exe` | ~100 MB each | 5.3 / 5.0 MB |
+| macOS `ffmpeg` / `ffprobe` (universal) | ~160 MB each | ~8 MB each |
+| NSIS installer | 58 MB | 6.7 MB |
+| MSI | 79 MB | 10 MB |
+| Probing a file (spawn ffprobe + probe, median of 10) | 254 ms | 64 ms |
+| Waveform of an hour-long file | ~9 s | about the same |
+| License | GPLv3 | LGPL 2.1 or later |
+
+On every test clip, probe results, keyframe lists and waveform peaks are identical to the full
+build's (checked with the real test clips and the smoke test's 21 generated ones).
+
+What changed from the plan below, found by the smoke test and by testing in the app:
+
+- **Raw elementary-stream demuxers** (`aac`, `ac3`, `eac3`, `mp3`, `dts`, `truehd`, `h264`,
+  `hevc`, `mpegvideo`, `m4v`, `vc1`): MPEG-PS and MPEG-TS identify their streams by probing the
+  data with these, so without them a `.mpg` had no video and some `.m2ts` files no audio.
+- **TrueHD/MLP decoders and parser**, since Blu-ray remuxes often lead with TrueHD, plus ADPCM,
+  Nellymoser and DV audio for old camera and web video.
+- **`apad`, `atrim` and `concat` filters** for the sampled waveform of files over 4 GB.
+- **Optimized for speed with LTO, not `--enable-small`**: `-Os` made long waveforms 10-20%
+  slower than the full build for about a MB.
+- **Windows is cross-compiled** on Ubuntu with mingw-w64 (the static build links only Windows
+  system DLLs), and macOS builds arm64 natively and x86_64 cross, joined with `lipo`.
+
+# Original design notes
 
 ## Why
 
@@ -186,7 +218,7 @@ A cheaper stopgap: BtbN publishes `win64-lgpl` builds. They are still full-featu
 smaller), and their daily builds are only kept for 14 days (monthly ones for two years), so they
 would have to be mirrored into our own release to pin them.
 
-## Estimated result
+## Estimated result (before it was built)
 
 All numbers are **estimates**, not measurements.
 

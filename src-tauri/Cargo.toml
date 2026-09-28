@@ -1,6 +1,6 @@
 [package]
 name = "trimmy"
-version = "1.0.0"
+version = "1.0.1"
 description = "A video trimmer. That's it."
 license = "MIT"
 repository = "https://github.com/TuckerScottAlleborn/trimmy"

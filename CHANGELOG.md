@@ -3,10 +3,21 @@
 What changed in each release. The release workflow copies a version's section into its GitHub
 release notes, so write it for people who use Trimmy.
 
-## Unreleased
+## 1.0.1
 
-- **The waveform draws in as it's read.** On a long recording, the timeline fills from left to
-  right while FFmpeg works through the audio, instead of staying empty until it's done.
+Big files, and a much smaller download.
+
+- **A 7 MB installer instead of 58 MB.** Trimmy now bundles its own build of FFmpeg with only
+  the parts it uses (about 5 MB instead of 100), so opening a file is faster too.
+- **Big files get a waveform.** Files over 4 GB (a two-hour Blu-ray remux, a long recording) no
+  longer read every byte for it: Trimmy measures a short slice at each point of the timeline
+  instead. A 38 GB movie on a USB hard drive went from about an hour to a minute or two.
+- **The waveform draws in as it's read,** left to right, instead of staying empty until it's done.
+- **Keyframes straight from the file's index.** For MP4, MOV and MKV files the start handle can
+  snap right away, instead of after a scan of the whole file.
+- **Closing a file stops FFmpeg.** Closing a video, opening another, or quitting Trimmy stops the
+  work it was doing in the background. Before, a big file could keep a drive busy for an hour
+  after it was gone from the screen.
 
 ## 1.0.0
 

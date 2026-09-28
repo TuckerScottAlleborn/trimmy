@@ -4,8 +4,8 @@
 //! - **Full** (most files): FFmpeg reads the whole audio track once and reports each bucket's
 //!   peak. Exact, and quick for game clips and anything else up to a few GB.
 //! - **Sampled** (files over 4 GB): FFmpeg jumps to the middle of each bucket and measures half a
-//!   second there. A 38 GB movie on a USB hard drive takes about half a minute this way instead
-//!   of an hour, since it reads a few hundred small pieces instead of every byte of the video.
+//!   second there. A 38 GB movie on a USB hard drive takes a minute or two this way instead of
+//!   an hour, since it reads a few hundred small pieces instead of every byte of the video.
 //!   With a bucket per 30 s of a two-hour film, the overview looks the same. Each point costs
 //!   about 0.1 s even from an SSD (FFmpeg re-reads the file's index for each), so smaller files,
 //!   however long, are faster read in full.
