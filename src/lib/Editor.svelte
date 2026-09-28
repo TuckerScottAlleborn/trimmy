@@ -54,7 +54,7 @@
   }
 
   // svelte-ignore state_referenced_locally
-  loadWaveform(video, addPeaks).then(
+  const waveformDone = loadWaveform(video, addPeaks).then(
     (p) => (peaks = p),
     () => (peaks = []),
   )
@@ -62,8 +62,10 @@
   // drive that can otherwise go on for a long time after it's gone from the screen.
   onDestroy(() => void closeVideo(video.path))
 
+  // After the waveform, not alongside it: when the file has no index to read, the keyframe scan
+  // reads the whole file too, and two readers at once make a hard drive thrash.
   // svelte-ignore state_referenced_locally
-  loadKeyframes(video).then(
+  waveformDone.then(() => loadKeyframes(video)).then(
     (k) => {
       keyframes = k
       start = keyframeAtOrBefore(k, start)
